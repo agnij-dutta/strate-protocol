@@ -1,0 +1,32 @@
+[package]
+name = "strate-factory"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Factory: deploys a (PT, YT, AMM, Oracle, YS) quintuple per (underlying, maturity)."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+strate-interfaces = { workspace = true }
+# Factory pulls the five contract crates as rlib deps so it can use their
+# typed `__constructor` arg structs directly. This avoids the brittle
+# manual `Map<Symbol, Val>` encoding the alternative would require.
+pt-token = { path = "../pt-token" }
+yt-token = { path = "../yt-token" }
+amm = { path = "../amm" }
+strate-oracle = { path = "../oracle" }
+yield-stripping = { path = "../yield-stripping" }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+strate-testutils = { workspace = true, features = ["mock-blend"] }
+
+[features]
+# Enable include_bytes! of the five pre-built WASMs into the test
+# harness. Off by default so `cargo check` works on a fresh clone; the
+# Factory test suite requires this feature plus a prior wasm32 build.
+test-wasm = []

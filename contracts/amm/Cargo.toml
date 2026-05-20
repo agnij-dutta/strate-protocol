@@ -1,0 +1,19 @@
+[package]
+name = "amm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Pendle-style logarithmic-curve AMM for PT/SY trading."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+strate-interfaces = { workspace = true }
+strate-math = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+strate-testutils = { workspace = true }

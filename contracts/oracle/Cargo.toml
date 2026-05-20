@@ -1,0 +1,19 @@
+[package]
+name = "strate-oracle"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "TWAP oracle wrapper over the Blend bRate with rate-limit / freeze guards."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+strate-interfaces = { workspace = true }
+strate-math = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+strate-testutils = { workspace = true, features = ["mock-blend"] }

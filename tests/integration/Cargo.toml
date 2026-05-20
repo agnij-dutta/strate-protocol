@@ -1,0 +1,41 @@
+[package]
+name = "strate-integration-tests"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Workspace-level cross-contract integration tests for Strate."
+publish = false
+
+[lib]
+crate-type = ["rlib"]
+
+# This crate is the ONLY place in the workspace that enables
+# `strate-testutils/wired` — every dependency below is a real contract
+# crate, so the testutils wired builder can register them via env.register.
+[dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+strate-testutils = { workspace = true, features = ["wired", "mock-blend"] }
+strate-interfaces = { workspace = true }
+strate-math = { workspace = true }
+
+pt-token = { path = "../../contracts/pt-token" }
+yt-token = { path = "../../contracts/yt-token" }
+amm = { path = "../../contracts/amm" }
+strate-oracle = { path = "../../contracts/oracle" }
+yield-stripping = { path = "../../contracts/yield-stripping" }
+strate-factory = { path = "../../contracts/factory" }
+
+[dev-dependencies]
+proptest = { workspace = true }
+
+[features]
+default = []
+# Slow proptest tier — enabled in nightly CI for 1M iterations of the
+# master invariant suite. Off by default; CI fast tier runs 10K.
+slow-fuzz = []
+
+# The integration tests live in `tests/integration/tests/*.rs`. We use
+# Cargo's per-file `[[test]]` autodiscovery rather than a single
+# `tests.rs` aggregator so a failure in flow_swap_amm.rs doesn't mask
+# the rest.

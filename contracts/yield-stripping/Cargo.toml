@@ -1,0 +1,22 @@
+[package]
+name = "yield-stripping"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Strate yield-stripping core: mint PT+YT, redeem, claim yield."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+strate-interfaces = { workspace = true }
+strate-math = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+strate-testutils = { workspace = true }
+pt-token = { path = "../pt-token" }
+yt-token = { path = "../yt-token" }
+proptest = { workspace = true }

@@ -1,0 +1,32 @@
+# Build artifacts
+target/
+**/target/
+*.wasm
+
+# Editor / OS
+.idea/
+.vscode/
+*.bak
+*.swp
+*.swo
+.DS_Store
+
+# Soroban / Stellar CLI
+.soroban/
+.stellar/
+
+# Coverage
+*.profraw
+*.profdata
+lcov.info
+tarpaulin-report.html
+
+# Local env
+.env
+.env.local
+
+# Generated docs
+target/doc/
+
+# Logs
+*.log

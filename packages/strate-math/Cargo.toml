@@ -1,0 +1,25 @@
+[package]
+name = "strate-math"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Fixed-point WAD math, exp, ln, and explicit rounding helpers for the Strate protocol."
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+# Math is no_std so contracts can pull it in freely. We deliberately do NOT
+# depend on soroban-sdk here; this keeps the crate testable on the host
+# without the SDK and lets the contracts pick the soroban error wrapping
+# they want.
+
+[dev-dependencies]
+proptest = { workspace = true }
+
+[features]
+default = []
+# Enable to expose internal helpers (split-mul intermediates, etc) for fuzz
+# harnesses outside the crate.
+internal = []

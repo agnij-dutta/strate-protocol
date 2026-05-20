@@ -1,0 +1,21 @@
+[package]
+name = "yt-token"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "SEP-41 Yield Token — claims accrued yield until maturity."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+stellar-fungible = { workspace = true }
+stellar-access-control = { workspace = true }
+strate-interfaces = { workspace = true }
+strate-math = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+strate-testutils = { workspace = true }

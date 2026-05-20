@@ -1,0 +1,13 @@
+[package]
+name = "strate-interfaces"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Shared traits, errors, and event schemas for the Strate protocol contracts."
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }

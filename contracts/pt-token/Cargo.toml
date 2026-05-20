@@ -1,0 +1,21 @@
+[package]
+name = "pt-token"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "SEP-41 Principal Token — burnable 1:1 for underlying at maturity."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+stellar-fungible = { workspace = true }
+stellar-access-control = { workspace = true }
+strate-interfaces = { workspace = true }
+strate-math = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+strate-testutils = { workspace = true }

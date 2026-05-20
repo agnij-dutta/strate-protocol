@@ -1,0 +1,54 @@
+[package]
+name = "strate-testutils"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Test harnesses, mock contracts, attacker state machines, and ledger-time helpers for the Strate protocol test suite."
+
+[lib]
+crate-type = ["rlib"]
+
+# IMPORTANT: this crate is a `dev-dependencies`-only consumer for the
+# contract crates. It is allowed to depend on `soroban-sdk` with the
+# `testutils` feature; production crates must not.
+[dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+strate-interfaces = { workspace = true }
+strate-math = { workspace = true }
+
+# The five contract crates + the Factory are pulled in as **optional**
+# dependencies and gated behind the `wired` cargo feature. The wired
+# builder calls `env.register(...)` on the contract types directly, so
+# it needs the rlib half of each `cdylib+rlib` crate.
+#
+# Contract crates depend on this crate as `dev-dependencies` only; the
+# `wired` feature is therefore never enabled when building a contract's
+# release binary. Top-level integration tests (the `tests/integration/`
+# workspace member) enable it explicitly. This breaks the apparent
+# circular dependency.
+pt-token = { path = "../../contracts/pt-token", optional = true }
+yt-token = { path = "../../contracts/yt-token", optional = true }
+amm = { path = "../../contracts/amm", optional = true }
+strate-oracle = { path = "../../contracts/oracle", optional = true }
+yield-stripping = { path = "../../contracts/yield-stripping", optional = true }
+strate-factory = { path = "../../contracts/factory", optional = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+
+[features]
+default = []
+# Expose the in-memory `MockBlendPool` for unit tests; off by default to
+# keep release builds of the workspace lean.
+mock-blend = []
+# Activate the integration-test wired builder. Pulls every contract
+# crate. Enabled by the top-level integration test crate ONLY.
+wired = [
+    "pt-token",
+    "yt-token",
+    "amm",
+    "strate-oracle",
+    "yield-stripping",
+    "strate-factory",
+]

@@ -14,6 +14,7 @@ mod common;
 
 use amm::MINIMUM_LIQUIDITY;
 use common::{AmmFixture, ONE};
+use soroban_sdk::testutils::Address as _;
 
 #[test]
 fn first_lp_mints_geometric_minus_minimum_liquidity() {
@@ -48,7 +49,7 @@ fn second_lp_proportional() {
         .add_liquidity(&fx.provider, &(1_000 * ONE), &(1_000 * ONE), &1);
 
     // Second LP deposits same ratio — gets a proportional share.
-    let bob = soroban_sdk::testutils::Address::generate(&fx.env);
+    let bob = soroban_sdk::Address::generate(&fx.env);
     fx.fund_pt(&bob, 500 * ONE);
     fx.fund_underlying(&bob, 500 * ONE);
 
@@ -103,13 +104,16 @@ fn remove_liquidity_returns_proportional_share() {
     let burn = lp_bal / 2;
     let (pt_out, und_out) = fx.amm_client.remove_liquidity(&fx.provider, &burn, &1, &1);
     // Pool had 1_000 each, total_lp = 1_000*ONE (= 10_000_000_000).
-    // Burn = (10_000_000_000 - 1_000) / 2 = 4_999_999_500.
-    // pt_out = floor(burn * 1_000*ONE / total_lp) ≈ 499.9999500 * ONE.
-    // We just sanity-check it's close to half and strictly < half (rounded down).
+    // MINIMUM_LIQUIDITY (1_000) is permanently locked, so the burnable
+    // half is (10_000_000_000 - 1_000) / 2 = 4_999_999_500.
+    // pt_out = floor(burn * 1_000*ONE / total_lp) = 4_999_999_500.
+    // We sanity-check it's close to half and strictly < half (rounded down).
     let half_reserve = 500 * ONE;
     assert!(pt_out <= half_reserve, "pt_out={pt_out} > half_reserve={half_reserve}");
     assert!(und_out <= half_reserve);
-    assert!(pt_out > half_reserve - 100, "pt_out={pt_out} unexpectedly small");
+    // Tolerance bounded by MINIMUM_LIQUIDITY (1_000); the locked share
+    // is what keeps pt_out from reaching exactly half.
+    assert!(pt_out > half_reserve - 1_000, "pt_out={pt_out} unexpectedly small");
 }
 
 #[test]

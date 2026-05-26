@@ -106,6 +106,38 @@ const TOPIC_FPAUSE: Symbol = symbol_short!("fpause");
 /// Topic tag for upgrade lifecycle events.
 const TOPIC_UPGRADE: Symbol = symbol_short!("upgrade");
 
+// =========================================================================
+// Bundled args structs
+// =========================================================================
+//
+// Soroban contract entry points are capped at 10 parameters. `deploy_market`
+// needs to forward 13 distinct config knobs to the five child contracts, so
+// we bundle the oracle config and the PT/YT cosmetic metadata into two
+// `contracttype` structs. The wire format is `Map<Symbol, Val>` keyed by
+// field name, which the SDK serializes losslessly across the host boundary.
+
+/// Oracle configuration forwarded to `Oracle::__constructor`.
+#[contracttype]
+#[derive(Clone)]
+pub struct OracleParams {
+    pub max_delta_per_sync_wad: i128,
+    pub max_staleness_ledgers: u32,
+    pub observation_window: u32,
+}
+
+/// PT + YT cosmetic metadata. The token decimals must match the underlying
+/// asset; PT and YT share it intentionally so 1 PT + 1 YT redeems 1 U at
+/// maturity with no scale conversion.
+#[contracttype]
+#[derive(Clone)]
+pub struct TokenMetadata {
+    pub pt_name: String,
+    pub pt_symbol: String,
+    pub yt_name: String,
+    pub yt_symbol: String,
+    pub decimals: u32,
+}
+
 // -- Per-contract salt XOR masks. Constants are intentionally distinct
 // byte patterns; their only requirement is pairwise inequality so the
 // five derived addresses for one market are distinct. The leading
@@ -266,17 +298,22 @@ impl Factory {
         maturity: u64,
         scalar_root: i128,
         fee_bps: u32,
-        // Oracle config (forwarded to Oracle::__constructor)
-        max_delta_per_sync_wad: i128,
-        max_staleness_ledgers: u32,
-        observation_window: u32,
-        // Token metadata
-        pt_name: String,
-        pt_symbol: String,
-        yt_name: String,
-        yt_symbol: String,
-        decimals: u32,
+        oracle_params: OracleParams,
+        token_meta: TokenMetadata,
     ) -> Address {
+        // Unpack bundled args for the rest of the function body.
+        let OracleParams {
+            max_delta_per_sync_wad,
+            max_staleness_ledgers,
+            observation_window,
+        } = oracle_params;
+        let TokenMetadata {
+            pt_name,
+            pt_symbol,
+            yt_name,
+            yt_symbol,
+            decimals,
+        } = token_meta;
         deployer.require_auth();
         let paused: bool = env
             .storage()

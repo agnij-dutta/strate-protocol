@@ -1,5 +1,9 @@
 [toolchain]
-channel = "1.83.0"
+# Bumped from 1.83 → 1.85 because several transitive deps in the soroban-sdk
+# 22.x supply chain (time-core, hashbrown, proptest 1.11, base64ct) now
+# require edition2024, which is only stable from 1.85. Our code is edition
+# 2021 so the bump is a no-op semantically.
+channel = "1.88.0"
 components = ["rustfmt", "clippy"]
 targets = ["wasm32-unknown-unknown"]
 profile = "minimal"

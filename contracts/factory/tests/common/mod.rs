@@ -16,7 +16,35 @@ use soroban_sdk::testutils::{Address as _, Ledger as _};
 use soroban_sdk::token::StellarAssetClient;
 use soroban_sdk::{Address, BytesN, Env, String};
 
-use strate_factory::{Factory, FactoryClient};
+use strate_factory::{Factory, FactoryClient, OracleParams, TokenMetadata};
+
+/// Default OracleParams used across tests. 5% max delta, 120 ledger staleness,
+/// 32-slot TWAP. Matches the values in deploy_default_market.
+pub fn default_oracle_params() -> OracleParams {
+    OracleParams {
+        max_delta_per_sync_wad: 50_000_000_000_000_000_i128,
+        max_staleness_ledgers: 120,
+        observation_window: 32,
+    }
+}
+
+/// Test helper: TokenMetadata with the same labels for PT name/symbol and
+/// YT name/symbol. Useful for tests that don't care about cosmetic distinction.
+pub fn make_token_meta(
+    env: &Env,
+    pt_name: &str,
+    pt_symbol: &str,
+    yt_name: &str,
+    yt_symbol: &str,
+) -> TokenMetadata {
+    TokenMetadata {
+        pt_name: String::from_str(env, pt_name),
+        pt_symbol: String::from_str(env, pt_symbol),
+        yt_name: String::from_str(env, yt_name),
+        yt_symbol: String::from_str(env, yt_symbol),
+        decimals: 7,
+    }
+}
 
 // =========================================================================
 // WASMs — fetched from each contract crate via the SDK's `wasm!` macro
@@ -168,14 +196,14 @@ impl FactoryFixture {
             &maturity,
             &WAD,    // scalar_root = 1.0 WAD
             &30_u32, // 30 bps swap fee
-            &50_000_000_000_000_000_i128, // 5% max delta
-            &120_u32,                     // 120 ledger staleness
-            &32_u32,                      // 32-slot TWAP
-            &String::from_str(&self.env, "PT-bUSDC-90d"),
-            &String::from_str(&self.env, "PT-bUSDC"),
-            &String::from_str(&self.env, "YT-bUSDC-90d"),
-            &String::from_str(&self.env, "YT-bUSDC"),
-            &7_u32,
+            &default_oracle_params(),
+            &make_token_meta(
+                &self.env,
+                "PT-bUSDC-90d",
+                "PT-bUSDC",
+                "YT-bUSDC-90d",
+                "YT-bUSDC",
+            ),
         )
     }
 

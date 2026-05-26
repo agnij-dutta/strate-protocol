@@ -25,12 +25,11 @@ repository = "https://github.com/strate-protocol/strate"
 # Core Soroban SDK (pinned to 22.x for stellar-contracts 0.4 compatibility).
 soroban-sdk = "22.0.0"
 
-# OpenZeppelin Stellar contracts (0.4 series). Subcrate names finalized below;
-# leave the version pinned at workspace level so all contracts agree.
-stellar-fungible = "0.4.0"
-stellar-ownable = "0.4.0"
-stellar-pausable = "0.4.0"
-stellar-access-control = "0.4.0"
+# OpenZeppelin Stellar contracts were originally planned as base
+# dependencies but the public 0.4 API surface was in flux and contracts
+# now ship first-party SEP-41 + access logic (see contracts/pt-token/lib.rs).
+# When we want to lean on OZ again the names landed on crates.io as
+# stellar-access, stellar-tokens, stellar-contract-utils at 0.7+.
 
 # Fixed-point base ops; we layer our own WAD helpers + exp/ln on top.
 soroban-fixed-point-math = "1.3.0"

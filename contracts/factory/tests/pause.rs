@@ -6,7 +6,6 @@
 mod common;
 
 use common::FactoryFixture;
-use soroban_sdk::String;
 
 #[test]
 fn paused_factory_rejects_deploy_market() {
@@ -25,14 +24,8 @@ fn paused_factory_rejects_deploy_market() {
             &maturity,
             &common::WAD,
             &30_u32,
-            &50_000_000_000_000_000_i128,
-            &120_u32,
-            &32_u32,
-            &String::from_str(&f.env, "PT"),
-            &String::from_str(&f.env, "PT"),
-            &String::from_str(&f.env, "YT"),
-            &String::from_str(&f.env, "YT"),
-            &7_u32,
+            &common::default_oracle_params(),
+            &common::make_token_meta(&f.env, "PT", "PT", "YT", "YT"),
         )
         .is_ok();
     assert!(!ok, "paused factory must reject deploy_market");

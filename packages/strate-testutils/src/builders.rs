@@ -35,6 +35,7 @@
 #![allow(clippy::too_many_lines)]
 
 use soroban_sdk::{Address, Env, Map, String, Symbol};
+use soroban_sdk::testutils::{Address as _, Ledger as _};
 
 use crate::constants::{DEFAULT_TENOR_SECONDS, ONE_UNDERLYING};
 

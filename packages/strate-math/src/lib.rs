@@ -51,12 +51,13 @@ pub mod fixed;
 pub mod ln;
 pub mod rounding;
 
-pub use exp::exp_wad;
+pub use exp::{exp_wad, exp_wad_checked};
 pub use fixed::{
-    div_wad, div_wad_down, div_wad_up, mul_wad, mul_wad_down, mul_wad_up, muldiv_ceil,
-    muldiv_checked, muldiv_floor,
+    div_wad, div_wad_checked, div_wad_down, div_wad_down_checked, div_wad_up, div_wad_up_checked,
+    mul_wad, mul_wad_checked, mul_wad_down, mul_wad_down_checked, mul_wad_up, mul_wad_up_checked,
+    muldiv_ceil, muldiv_ceil_checked, muldiv_checked, muldiv_floor, muldiv_floor_checked,
 };
-pub use ln::ln_wad;
+pub use ln::{ln_wad, ln_wad_checked};
 pub use rounding::RoundingMode;
 
 // -------------------------------------------------------------------------

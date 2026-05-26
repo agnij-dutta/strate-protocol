@@ -55,14 +55,14 @@ fn distinct_maturities_succeed() {
         &maturity2,
         &common::WAD,
         &30_u32,
-        &50_000_000_000_000_000_i128,
-        &120_u32,
-        &32_u32,
-        &soroban_sdk::String::from_str(&f.env, "PT-bUSDC-180d"),
-        &soroban_sdk::String::from_str(&f.env, "PT-bUSDC"),
-        &soroban_sdk::String::from_str(&f.env, "YT-bUSDC-180d"),
-        &soroban_sdk::String::from_str(&f.env, "YT-bUSDC"),
-        &7_u32,
+        &common::default_oracle_params(),
+        &common::make_token_meta(
+            &f.env,
+            "PT-bUSDC-180d",
+            "PT-bUSDC",
+            "YT-bUSDC-180d",
+            "YT-bUSDC",
+        ),
     );
     assert_eq!(f.factory_client.market_count(), 2);
 }

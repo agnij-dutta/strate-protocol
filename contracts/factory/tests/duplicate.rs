@@ -38,14 +38,8 @@ fn deploy_count_unchanged_after_failed_duplicate() {
             &maturity,
             &common::WAD,
             &30_u32,
-            &50_000_000_000_000_000_i128,
-            &120_u32,
-            &32_u32,
-            &soroban_sdk::String::from_str(&f.env, "PT"),
-            &soroban_sdk::String::from_str(&f.env, "PT"),
-            &soroban_sdk::String::from_str(&f.env, "YT"),
-            &soroban_sdk::String::from_str(&f.env, "YT"),
-            &7_u32,
+            &common::default_oracle_params(),
+            &common::make_token_meta(&f.env, "PT", "PT", "YT", "YT"),
         )
         .is_ok();
     assert!(!ok, "duplicate deploy must revert");

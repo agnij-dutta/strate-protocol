@@ -95,8 +95,12 @@ pub fn ln_wad_checked(x: i128) -> Result<i128, Error> {
         }
         r = x << shift;
     }
-    // Sanity: r ∈ [WAD, 2*WAD).
-    debug_assert!(r >= WAD && r < 2 * WAD, "range-reduce invariant: r={}", r);
+    // Sanity: r ∈ (WAD/2, 2*WAD). The loop counts floor(log2(WAD/x)) so
+    // for x just below WAD (where WAD/x truncates to 1) we end up with
+    // r slightly below WAD. The atanh series in step 2 still converges
+    // for |u| < 1/3, which holds for r in this wider window, so the math
+    // does not need a post-shift correction.
+    debug_assert!(r > WAD / 2 && r < 2 * WAD, "range-reduce invariant: r={}", r);
 
     // Step 2: compute ln(r/WAD) via atanh series. Let
     //   u = (r - WAD) / (r + WAD)   (WAD-scaled, |u| < 1/3)

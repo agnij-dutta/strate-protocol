@@ -3,7 +3,6 @@
 mod common;
 
 use common::{FactoryFixture, DAY, START_TS, WAD};
-use soroban_sdk::String;
 
 const SHORT_MATURITY: u64 = START_TS + 5 * DAY;
 
@@ -22,14 +21,8 @@ fn try_deploy(
             &maturity,
             &scalar_root,
             &fee_bps,
-            &50_000_000_000_000_000_i128,
-            &120_u32,
-            &32_u32,
-            &String::from_str(&f.env, "PT"),
-            &String::from_str(&f.env, "PT"),
-            &String::from_str(&f.env, "YT"),
-            &String::from_str(&f.env, "YT"),
-            &7_u32,
+            &common::default_oracle_params(),
+            &common::make_token_meta(&f.env, "PT", "PT", "YT", "YT"),
         )
         .is_ok()
 }

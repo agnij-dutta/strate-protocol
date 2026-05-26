@@ -21,14 +21,8 @@ fn market_count_increments_per_deploy() {
         &m2,
         &common::WAD,
         &30_u32,
-        &50_000_000_000_000_000_i128,
-        &120_u32,
-        &32_u32,
-        &soroban_sdk::String::from_str(&f.env, "PT-180"),
-        &soroban_sdk::String::from_str(&f.env, "PT-180"),
-        &soroban_sdk::String::from_str(&f.env, "YT-180"),
-        &soroban_sdk::String::from_str(&f.env, "YT-180"),
-        &7_u32,
+        &common::default_oracle_params(),
+        &common::make_token_meta(&f.env, "PT-180", "PT-180", "YT-180", "YT-180"),
     );
     assert_eq!(f.factory_client.market_count(), 2);
 }
@@ -47,14 +41,8 @@ fn get_market_by_index_returns_each_address() {
         &m2,
         &common::WAD,
         &30_u32,
-        &50_000_000_000_000_000_i128,
-        &120_u32,
-        &32_u32,
-        &soroban_sdk::String::from_str(&f.env, "PT-180"),
-        &soroban_sdk::String::from_str(&f.env, "PT-180"),
-        &soroban_sdk::String::from_str(&f.env, "YT-180"),
-        &soroban_sdk::String::from_str(&f.env, "YT-180"),
-        &7_u32,
+        &common::default_oracle_params(),
+        &common::make_token_meta(&f.env, "PT-180", "PT-180", "YT-180", "YT-180"),
     );
 
     assert_eq!(f.factory_client.get_market_by_index(&0).unwrap(), ys1);

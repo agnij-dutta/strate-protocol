@@ -11,8 +11,6 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 soroban-sdk = { workspace = true }
-stellar-fungible = { workspace = true }
-stellar-access-control = { workspace = true }
 strate-interfaces = { workspace = true }
 strate-math = { workspace = true }
 

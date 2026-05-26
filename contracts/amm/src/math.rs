@@ -334,7 +334,9 @@ mod tests {
         // For x_in == x_out == 100 WAD and dx_in == 10 WAD,
         // dx_out exact = 100 * 10 / 110 = 9.0909... WAD.
         let dx = uniswap_check(100 * ONE, 10 * ONE, 0);
-        let expected = 100 * ONE * 10 * ONE / (110 * ONE);
+        // Reordered to avoid i128 overflow at compile time. Algebraically
+        // identical to (100 * ONE * 10 * ONE) / (110 * ONE) = (1000 * ONE) / 110.
+        let expected = (100 * 10 * ONE) / 110;
         // Should match within a few wei from exp/ln rounding.
         let diff = (dx - expected).abs();
         assert!(diff < 100_000_000, "dx={dx} expected={expected} diff={diff}");
@@ -368,13 +370,22 @@ mod tests {
 
     #[test]
     fn skewed_weights_favour_higher_weight_side() {
-        // w_in > w_out: less output per unit input.
-        // w_in < w_out: more output per unit input.
+        // Balancer-style weighted swap:
+        //   dx_out = x_out * (1 - (x_in / (x_in + dx_in))^(w_in / w_out))
+        //
+        // Higher w_in (relative to w_out) increases the exponent above 1,
+        // which pulls the base term toward 0 and thus increases dx_out.
+        // Equivalently: the higher-weighted asset is the "scarcer" side
+        // and trades from it (i.e. swapping IT for the lower-weighted
+        // asset) yields more output per unit input.
+        //
+        // So w_in > w_out  ⇒  MORE output per unit input
+        //    w_in < w_out  ⇒  LESS output per unit input
         let low_w_in = compute_swap_out(100 * ONE, 100 * ONE, 10 * ONE, HALF / 2, HALF + HALF / 2, 0)
             .unwrap();
         let high_w_in = compute_swap_out(100 * ONE, 100 * ONE, 10 * ONE, HALF + HALF / 2, HALF / 2, 0)
             .unwrap();
-        assert!(low_w_in > high_w_in, "low_w_in={low_w_in} high_w_in={high_w_in}");
+        assert!(high_w_in > low_w_in, "low_w_in={low_w_in} high_w_in={high_w_in}");
     }
 
     #[test]

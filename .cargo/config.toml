@@ -1,0 +1,17 @@
+# Workspace cargo config.
+#
+# Disables the `reference-types` and `multivalue` WASM proposals on the
+# wasm32-unknown-unknown target. Rust 1.85+ enables both by default in its
+# codegen, but the Soroban host's WASM VM (soroban-env-host 22.x) does not
+# implement either proposal yet. Without these flags, every contract WASM
+# fails validation inside `register_contract_wasm` / `deploy_v2` with:
+#
+#   Module(Translation(TranslationError {
+#     message: "reference-types not enabled: zero byte expected"
+#   }))
+#
+# Track Soroban's reference-types adoption at
+# https://github.com/stellar/rs-soroban-env
+
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=-reference-types,-multivalue"]

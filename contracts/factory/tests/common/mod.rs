@@ -95,19 +95,19 @@ pub fn make_token_meta(
 #[cfg(feature = "test-wasm")]
 mod wasm_bytes {
     pub const ORACLE_WASM: &[u8] = include_bytes!(
-        "../../../../target/wasm32-unknown-unknown/release/strate_oracle.wasm"
+        "../../../../target/wasm32v1-none/release/strate_oracle.wasm"
     );
     pub const PT_WASM: &[u8] = include_bytes!(
-        "../../../../target/wasm32-unknown-unknown/release/pt_token.wasm"
+        "../../../../target/wasm32v1-none/release/pt_token.wasm"
     );
     pub const YT_WASM: &[u8] = include_bytes!(
-        "../../../../target/wasm32-unknown-unknown/release/yt_token.wasm"
+        "../../../../target/wasm32v1-none/release/yt_token.wasm"
     );
     pub const AMM_WASM: &[u8] = include_bytes!(
-        "../../../../target/wasm32-unknown-unknown/release/amm.wasm"
+        "../../../../target/wasm32v1-none/release/amm.wasm"
     );
     pub const YS_WASM: &[u8] = include_bytes!(
-        "../../../../target/wasm32-unknown-unknown/release/yield_stripping.wasm"
+        "../../../../target/wasm32v1-none/release/yield_stripping.wasm"
     );
 }
 

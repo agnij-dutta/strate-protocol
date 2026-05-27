@@ -1,8 +1,8 @@
 //! Strate yield-stripping core contract.
 //!
-//! Holds underlying, mints PT + YT 1:1, tracks a global yield index
-//! sourced from a rate oracle wrapping Blend, and pays out accrued
-//! yield to YT holders on demand.
+//! Holds underlying, mints PT + YT 1:1, fetches the Blend rate via the
+//! Oracle, derives a global yield index from it, and pushes that index
+//! into YT — which owns the per-user accrual bookkeeping.
 //!
 //! ## Threat-model anchors
 //!
@@ -13,21 +13,25 @@
 //!   share price below the floor of `DEAD_SHARES`.
 //!
 //! - **C-02 — stale rate at YT mint**: `mint` calls
-//!   `sync_yield_index()` *before* settling the recipient. The new YT
-//!   holder's `UserIndex` is therefore the freshly-synced global index,
-//!   not the cached one.
+//!   `sync_yield_index()` *before* invoking `YT.mint`. The new YT
+//!   holder's snapshot, written inside YT's settle-local before its
+//!   balance increments, is therefore the freshly-pushed global
+//!   index, not a stale one.
 //!
-//! - **H-01 — YT-transfer recipient stale snapshot**: the YT contract's
-//!   `_update` hook calls [`Self::settle_user`] for **both** `from` and
-//!   `to` *before* mutating balances. `settle_user` always writes the
-//!   user index, even when balance is zero — this is the critical line
-//!   the naive Pendle port misses.
+//! - **H-01 — YT-transfer recipient stale snapshot**: YT settles both
+//!   `from` and `to` *locally*, in its own contract, *before* mutating
+//!   balances. The minter (this contract) is not on the call stack
+//!   during a YT transfer, so the Soroban host's re-entry guard never
+//!   trips. See `docs/handoff/H-01-reentry-fix.md` for the migration
+//!   from the original callback topology.
 //!
 //! ## Storage and TTL
 //!
-//! Per ADR-004: Instance for the hot config; Persistent for balances /
-//! per-user indices / supplies. State-mutating entry points extend
-//! persistent TTL by `EXTENDED_TTL = 500_000` ledgers.
+//! YS now stores only: the immutable `Config`, pause state, the
+//! `InitialBlendRate` baseline, the `LastIndexUpdate` ledger
+//! timestamp, the `TotalUnderlying` accumulator, and the
+//! `DeadSharesMinted` latch. The global yield index and per-user
+//! accruals live in YT.
 
 #![no_std]
 #![deny(unsafe_code)]
@@ -42,7 +46,7 @@ use strate_interfaces::events::{
     TOPIC_REDEEM, TOPIC_YIELD,
 };
 use strate_interfaces::Error;
-use strate_math::{div_wad_down, mul_wad_down, mul_wad_up, WAD};
+use strate_math::{div_wad_down, mul_wad_up};
 
 // =========================================================================
 // Constants
@@ -59,10 +63,6 @@ const DEAD_SHARES: i128 = 1_000;
 /// implausible jumps freezes the Oracle path; the legitimate
 /// recovery is for the admin to investigate.
 const MAX_DELTA_PER_SYNC_WAD: i128 = 50_000_000_000_000_000; // 5%
-
-/// Persistent TTL configuration (mirrors ADR-004).
-const EXTENDED_TTL: u32 = 500_000;
-const TTL_BUMP_THRESHOLD: u32 = 100_000;
 
 /// Unpause timelock — 48h in seconds, per ADR-002 §"Emergency pause".
 const UNPAUSE_TIMELOCK_SECS: u64 = 48 * 60 * 60;
@@ -89,16 +89,20 @@ pub trait PtMintBurn {
     fn balance(env: Env, id: Address) -> i128;
 }
 
-/// YT mint/burn + balance client. Note: YT's `mint`/`burn` are the
-/// versions defined in `yt-token` that invoke the `_update` hook
-/// reentrantly back into `YieldStripping::settle_user` before any
-/// balance change.
+/// YT mint/burn + yield-index client. Note: YT's mint/burn settle the
+/// affected account locally (no callback into YS), and YS pushes the
+/// global index in via `push_yield_index` on every sync. See
+/// `docs/handoff/H-01-reentry-fix.md`.
 #[contractclient(name = "YtClient")]
-pub trait YtMintBurn {
+pub trait YtMintBurnYield {
     fn mint(env: Env, to: Address, amount: i128);
     fn burn(env: Env, from: Address, amount: i128);
     fn total_supply(env: Env) -> i128;
     fn balance(env: Env, id: Address) -> i128;
+    fn global_yield_index(env: Env) -> i128;
+    fn push_yield_index(env: Env, new_index: i128);
+    fn accrued_yield(env: Env, user: Address) -> i128;
+    fn drain_accrued(env: Env, user: Address) -> i128;
 }
 
 /// Minimal SEP-41 underlying client.
@@ -143,20 +147,12 @@ enum DataKey {
     /// Used as the denominator when computing the global index from
     /// any later Blend rate.
     InitialBlendRate,
-    /// Global yield index, WAD-scaled.
-    GlobalYieldIndex,
     /// Ledger timestamp of the last sync.
     LastIndexUpdate,
     /// Latched once the first deposit fires the C-01 dead-shares guard.
     DeadSharesMinted,
     /// Total underlying ever deposited (gross). For invariant checks.
     TotalUnderlying,
-
-    // ---- Persistent (user-level) --------------------------------
-    /// Per-user index snapshot, WAD-scaled.
-    UserIndex(Address),
-    /// Per-user claimable yield (in underlying units).
-    AccruedYield(Address),
 }
 
 // =========================================================================
@@ -170,15 +166,15 @@ pub struct YieldStripping;
 impl YieldStripping {
     /// Construct.
     ///
-    /// Initialises the global index to `WAD` (= 1.0). The `InitialBlendRate`
-    /// slot is left unset; the **first** `sync_yield_index` call latches
-    /// whatever rate the Oracle reports as the baseline. This makes the
-    /// constructor independent of Oracle liveness at deploy time.
+    /// The global index lives in YT and defaults to `WAD` there. The
+    /// `InitialBlendRate` slot is left unset; the **first**
+    /// `sync_yield_index` call latches whatever rate the Oracle
+    /// reports as the baseline. This makes the constructor
+    /// independent of Oracle liveness at deploy time.
     pub fn __constructor(env: Env, cfg: Config) {
         let s = env.storage().instance();
         s.set(&DataKey::Config, &cfg);
         s.set(&DataKey::Paused, &false);
-        s.set(&DataKey::GlobalYieldIndex, &WAD);
         s.set(&DataKey::LastIndexUpdate, &env.ledger().timestamp());
         s.set(&DataKey::DeadSharesMinted, &false);
         s.set(&DataKey::TotalUnderlying, &0_i128);
@@ -195,37 +191,21 @@ impl YieldStripping {
             .unwrap_or_else(|| panic_with_error!(&env, Error::NotInitialized))
     }
 
-    /// Read the current global yield index, WAD-scaled. Does **not**
-    /// trigger a sync — that's the role of `sync_yield_index`.
+    /// Read the current global yield index, WAD-scaled. Delegates to
+    /// YT, which owns the source-of-truth value. Does **not** trigger
+    /// a sync — that's the role of `sync_yield_index`.
     pub fn current_index(env: Env) -> i128 {
-        env.storage()
-            .instance()
-            .get(&DataKey::GlobalYieldIndex)
-            .unwrap_or(WAD)
+        let cfg = Self::config(env.clone());
+        YtClient::new(&env, &cfg.yt).global_yield_index()
     }
 
-    /// Read what `user` would receive if they called `claim_yield` right
-    /// now, **without** mutating state. The accrued amount is computed
-    /// against the cached global index (no Oracle round-trip), so it
-    /// reflects the index as last synced.
+    /// Read what `user` would receive if they called `claim_yield`
+    /// right now, **without** mutating state. Delegates to YT's
+    /// `accrued_yield`, which combines the persisted bucket with the
+    /// not-yet-settled delta against the cached global index.
     pub fn pending_yield(env: Env, user: Address) -> i128 {
-        let global = Self::current_index(env.clone());
-        let user_idx = read_user_index(&env, &user);
-        let stored: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::AccruedYield(user.clone()))
-            .unwrap_or(0);
-        if user_idx == 0 {
-            // Never settled; nothing pending against the index.
-            return stored;
-        }
-        let yt = yt_balance(&env, &user);
-        if yt == 0 || global <= user_idx {
-            return stored;
-        }
-        let delta = global - user_idx;
-        stored.saturating_add(mul_wad_down(yt, delta))
+        let cfg = Self::config(env.clone());
+        YtClient::new(&env, &cfg.yt).accrued_yield(&user)
     }
 
     /// Whether the contract is paused.
@@ -254,13 +234,14 @@ impl YieldStripping {
     ///
     /// **CEI order:**
     /// 1. `from.require_auth`, pause check, maturity check.
-    /// 2. `sync_yield_index` (rolls the global index forward — C-02 fix).
+    /// 2. `sync_yield_index` — pushes the fresh global index into YT
+    ///    (C-02 fix: the snapshot YT writes for `to` is the post-sync
+    ///    value).
     /// 3. C-01 dead-shares guard on the very first deposit.
     /// 4. Read state.
-    /// 5. Effects (TotalUnderlying, user accruals).
+    /// 5. Effects (TotalUnderlying).
     /// 6. Interactions: pull underlying, call PT.mint, call YT.mint.
-    ///    YT.mint re-enters via `settle_user(to)` *before* incrementing
-    ///    `to`'s balance — that settle picks up the **fresh** index.
+    ///    YT.mint settles `to` locally *before* incrementing balance.
     /// 7. Emit `MintEvent`.
     pub fn mint(env: Env, from: Address, to: Address, amount: i128) -> (i128, i128, i128) {
         from.require_auth();
@@ -273,10 +254,7 @@ impl YieldStripping {
             panic_with_error!(&env, Error::MinDepositNotMet);
         }
 
-        // C-02: index must be fresh before the new YT holder's snapshot
-        // is taken. The YT _update hook (invoked further down inside
-        // YtClient::mint) reads `Self::settle_user`, which reads the
-        // global index. Sync first to guarantee that read is fresh.
+        // C-02: refresh the global index in YT before any settle runs.
         Self::sync_yield_index(env.clone());
 
         // C-01: first-depositor dead-shares lock.
@@ -291,13 +269,7 @@ impl YieldStripping {
         let mut dead_yt = 0_i128;
         if !dead_done {
             // Reserve DEAD_SHARES from the user's mint and direct them
-            // to the YS contract itself. The user *still* receives
-            // `amount` PT/YT for `amount` underlying; the dead shares
-            // are paid for by the protocol (the YS holds them
-            // permanently and the underlying that backs them is locked
-            // alongside). This trades a one-time tiny protocol cost for
-            // permanent C-01 immunity. Documented rationale:
-            // `docs/security/THREAT-MODEL.md` §C-01.
+            // to the YS contract itself. See `docs/security/THREAT-MODEL.md` §C-01.
             if amount <= DEAD_SHARES {
                 panic_with_error!(&env, Error::MinDepositNotMet);
             }
@@ -336,9 +308,8 @@ impl YieldStripping {
             YtClient::new(&env, &cfg.yt).mint(&self_addr, &dead_yt);
         }
         PtClient::new(&env, &cfg.pt).mint(&to, &pt_to_mint);
-        // YT.mint invokes settle_user(to) inside its _update hook
-        // BEFORE incrementing `to`'s balance — the snapshot it writes
-        // is the post-sync global index, mitigating C-02.
+        // YT.mint settles `to` locally with the post-sync global
+        // index, mitigating C-02 without re-entering YS.
         YtClient::new(&env, &cfg.yt).mint(&to, &yt_to_mint);
 
         let index_at_mint = Self::current_index(env.clone());
@@ -381,7 +352,7 @@ impl YieldStripping {
             .instance()
             .set(&DataKey::TotalUnderlying, &(prev - amount));
 
-        // Interactions: burn YT (which settles `from`), burn PT, transfer
+        // Interactions: burn YT (settles `from` locally), burn PT, transfer
         // underlying.
         YtClient::new(&env, &cfg.yt).burn(&from, &amount);
         PtClient::new(&env, &cfg.pt).burn(&from, &amount);
@@ -453,25 +424,25 @@ impl YieldStripping {
     }
 
     /// Claim accrued yield for `user`.
+    ///
+    /// **CEI order:** sync the index into YT, drain YT's accrued
+    /// bucket for `user` (this also settles any pending delta inside
+    /// YT), then transfer the underlying. Reversing the last two
+    /// would open a TOCTOU window in which the index could advance
+    /// between drain and transfer; do not do that.
     pub fn claim_yield(env: Env, user: Address) -> i128 {
         user.require_auth();
         // Pause does NOT block claim — exits remain open.
         let cfg = Self::config(env.clone());
 
-        // Sync + settle, in that order. After this call:
-        //   AccruedYield[user] holds every wei `user` is owed up to now.
-        //   UserIndex[user] == GlobalYieldIndex.
+        // Roll the global index forward before draining so `user`
+        // collects every wei owed up to the current ledger.
         Self::sync_yield_index(env.clone());
-        let user_idx_before = read_user_index(&env, &user);
-        Self::settle_user(env.clone(), user.clone());
+        let user_idx_before = YtClient::new(&env, &cfg.yt).global_yield_index();
+        let amount = YtClient::new(&env, &cfg.yt).drain_accrued(&user);
+        let global = YtClient::new(&env, &cfg.yt).global_yield_index();
 
-        let amount: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::AccruedYield(user.clone()))
-            .unwrap_or(0);
         if amount == 0 {
-            let global = Self::current_index(env.clone());
             env.events().publish(
                 (symbol_short!("yield"), user.clone()),
                 YieldClaimedEvent {
@@ -485,11 +456,6 @@ impl YieldStripping {
             return 0;
         }
 
-        // Effects: zero the claimable.
-        env.storage()
-            .persistent()
-            .set(&DataKey::AccruedYield(user.clone()), &0_i128);
-
         // Interaction: pay out underlying.
         UnderlyingClient::new(&env, &cfg.underlying).transfer(
             &env.current_contract_address(),
@@ -497,7 +463,6 @@ impl YieldStripping {
             &amount,
         );
 
-        let global = Self::current_index(env.clone());
         env.events().publish(
             (symbol_short!("yield"), user.clone()),
             YieldClaimedEvent {
@@ -512,21 +477,24 @@ impl YieldStripping {
     }
 
     // =====================================================================
-    // Index sync + settle
+    // Index sync
     // =====================================================================
 
-    /// Refresh the global yield index from the Oracle. Permissionless.
+    /// Refresh the global yield index from the Oracle and push it to YT.
+    /// Permissionless.
     ///
     /// Steps:
     /// 1. Read current Blend rate via the Oracle client. On the **first**
-    ///    sync, latch it as `InitialBlendRate` and exit (the index stays
-    ///    at `WAD` — there is no accrual to attribute pre-launch).
+    ///    sync, latch it as `InitialBlendRate` and exit (the index in
+    ///    YT stays at `WAD` — there is no accrual to attribute
+    ///    pre-launch).
     /// 2. Compute the candidate new global index:
     ///    `new = blend_rate / initial_rate` (in WAD).
     /// 3. Enforce monotonicity: `new >= old`. Oracle that goes backward
-    ///    is rejected.
+    ///    is rejected. (YT also enforces this on `push_yield_index`;
+    ///    we keep both checks so YS surfaces the richer error context.)
     /// 4. Enforce delta cap: `(new - old) / old <= MAX_DELTA_PER_SYNC`.
-    /// 5. Commit and emit `IndexSyncEvent`.
+    /// 5. Push to YT and emit `IndexSyncEvent`.
     pub fn sync_yield_index(env: Env) {
         let cfg = Self::config(env.clone());
         // Post-maturity: index is frozen.
@@ -550,7 +518,8 @@ impl YieldStripping {
             }
         };
 
-        let old_index: i128 = s.get(&DataKey::GlobalYieldIndex).unwrap_or(WAD);
+        let yt = YtClient::new(&env, &cfg.yt);
+        let old_index = yt.global_yield_index();
         // new = blend_rate / initial * WAD
         let new_index = div_wad_down(blend_rate, initial);
 
@@ -569,7 +538,9 @@ impl YieldStripping {
             }
         }
 
-        s.set(&DataKey::GlobalYieldIndex, &new_index);
+        if new_index != old_index {
+            yt.push_yield_index(&new_index);
+        }
         s.set(&DataKey::LastIndexUpdate, &env.ledger().timestamp());
 
         env.events().publish(
@@ -581,61 +552,6 @@ impl YieldStripping {
             },
         );
         let _ = TOPIC_INDEX;
-    }
-
-    /// Settle `user`'s yield up to the current global index.
-    ///
-    /// **CRITICAL — H-01 mitigation.** The YT contract's `_update`
-    /// hook invokes this *before* any balance mutation. The two
-    /// non-obvious lines are:
-    ///
-    /// 1. `sync_yield_index` is called first, so the snapshot we write
-    ///    is the post-sync global value.
-    ///
-    /// 2. `UserIndex[user]` is updated **even when YT balance is zero**.
-    ///    Without this, a recipient who just received an inbound
-    ///    transfer (balance still 0 at the moment of settle, balance > 0
-    ///    immediately after) would inherit the *old* snapshot and the
-    ///    next index advance would credit them yield they didn't earn.
-    ///    This is the line every Pendle port misses.
-    ///
-    /// Re-entrant via the YT `_update` hook: settle_user → YT.balance()
-    /// is a read-only call on a separate contract instance; safe.
-    pub fn settle_user(env: Env, user: Address) {
-        // No `require_auth` here: settle is idempotent and self-bookkeeping.
-        // It is callable by the YT contract via the _update hook, and
-        // also by entry-point flows like `claim_yield` that hold caller
-        // auth on their own.
-        Self::sync_yield_index(env.clone());
-
-        let global = Self::current_index(env.clone());
-        let user_idx = read_user_index(&env, &user);
-        let yt_bal = yt_balance(&env, &user);
-
-        if yt_bal > 0 && user_idx > 0 && global > user_idx {
-            let delta = global - user_idx;
-            let accrued = mul_wad_down(yt_bal, delta);
-            let current: i128 = env
-                .storage()
-                .persistent()
-                .get(&DataKey::AccruedYield(user.clone()))
-                .unwrap_or(0);
-            let new_total = current
-                .checked_add(accrued)
-                .unwrap_or_else(|| panic_with_error!(&env, Error::MathOverflow));
-            let k = DataKey::AccruedYield(user.clone());
-            env.storage().persistent().set(&k, &new_total);
-            env.storage()
-                .persistent()
-                .extend_ttl(&k, TTL_BUMP_THRESHOLD, EXTENDED_TTL);
-        }
-
-        // ALWAYS write the snapshot. This is the H-01 line.
-        let k = DataKey::UserIndex(user.clone());
-        env.storage().persistent().set(&k, &global);
-        env.storage()
-            .persistent()
-            .extend_ttl(&k, TTL_BUMP_THRESHOLD, EXTENDED_TTL);
     }
 
     // =====================================================================
@@ -690,19 +606,4 @@ fn require_not_paused(env: &Env) {
     if p {
         panic_with_error!(env, Error::Paused);
     }
-}
-
-fn read_user_index(env: &Env, user: &Address) -> i128 {
-    env.storage()
-        .persistent()
-        .get(&DataKey::UserIndex(user.clone()))
-        .unwrap_or(0)
-}
-
-fn yt_balance(env: &Env, user: &Address) -> i128 {
-    let cfg: Config = match env.storage().instance().get(&DataKey::Config) {
-        Some(c) => c,
-        None => return 0,
-    };
-    YtClient::new(env, &cfg.yt).balance(user)
 }

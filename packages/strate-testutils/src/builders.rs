@@ -448,6 +448,14 @@ mod wired {
         pt_token::PtTokenClient::new(env, &pt).initialize_minter(&ys);
         yt_token::YtTokenClient::new(env, &yt).initialize_minter(&ys);
 
+        // 8b. Prime the Oracle's cache so downstream `get_rate` calls
+        // pass the staleness check. Without this, the first YS.mint
+        // (whether driven by `seed AMM liquidity` below or by an
+        // integration-test entry point) reverts with `OracleStale`
+        // because the cache is the post-construction sentinel of 0.
+        let oracle_client = strate_oracle::OracleClient::new(env, &oracle);
+        let _ = oracle_client.try_sync_rate();
+
         // 9. Seed users.
         let mut users = Map::new(env);
         for (name, balance) in &b.seeded_users {

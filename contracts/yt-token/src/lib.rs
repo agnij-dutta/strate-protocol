@@ -1,15 +1,41 @@
-//! Strate YT — Yield Token (SEP-41 + `_update` hook).
+//! Strate YT — Yield Token (SEP-41 + local yield-index accounting).
 //!
-//! Identical SEP-41 surface to PT, but every balance mutation routes
-//! through an `_update` hook that cross-contract-calls
-//! `YieldStripping::settle_user(addr)` for **both** `from` and `to`
-//! *before* the balance mutates. This is the H-01 mitigation in
-//! `docs/security/THREAT-MODEL.md` — the bug nearly every Pendle port
-//! has shipped with at least once.
+//! Identical SEP-41 surface to PT, but YT also owns the yield-index
+//! accounting that pays out variable yield. Every balance mutation
+//! (mint / burn / transfer) settles the affected users locally — no
+//! cross-contract callback into the minter — and the minter pushes
+//! the new global index in on every sync.
 //!
-//! Mint-from-zero and burn-to-zero are no-ops on the zero-address side
-//! (we use `current_contract_address` as the sentinel for "no
-//! counterparty"). See ADR-001 §3.
+//! ## Re-entry rationale (H-01 in the Soroban host)
+//!
+//! Soroban 22.x forbids re-entering a contract already on the call
+//! stack. The original architecture had YT call back into YS during
+//! every balance change (to invoke `YS.settle_user`); that pattern
+//! deadlocks on Soroban. Option B from `docs/handoff/H-01-reentry-fix.md`
+//! moves the accrual state into YT itself, so the settlement is a
+//! pure local read. YS pushes the new global index via
+//! [`YtToken::push_yield_index`] and drains an account's accrued
+//! pot via [`YtToken::drain_accrued`].
+//!
+//! ## State
+//!
+//! - `GlobalYieldIndex` (instance, WAD-scaled): the latest global
+//!   yield-per-YT index, mirrored from YS via `push_yield_index`.
+//! - `UserYieldIndex(addr)` (persistent, WAD-scaled): the snapshot
+//!   of `GlobalYieldIndex` as of `addr`'s last settle.
+//! - `AccruedYield(addr)` (persistent, underlying units): the amount
+//!   `addr` has earned but not yet drained. `drain_accrued` zeroes
+//!   this and returns it.
+//!
+//! ## Invariants
+//!
+//! - **M3 (Monotonicity of accrued yield)**: `push_yield_index`
+//!   rejects any `new_index < current_index`. Equality is allowed.
+//! - **U1 (NFL on YT transfer)**: settle runs on both sides before
+//!   the balance moves, so a fresh recipient inherits the current
+//!   global as their snapshot — no retroactive credit.
+//! - **L1 (claim ≤ accrued)**: `drain_accrued` is atomic; the read
+//!   of `AccruedYield` and the zero-write happen in the same call.
 //!
 //! Storage and TTL handling mirrors PT; see [`crate`] header docs there.
 
@@ -17,32 +43,14 @@
 #![deny(unsafe_code)]
 
 use soroban_sdk::{
-    contract, contractclient, contractimpl, contracttype, panic_with_error, symbol_short, Address,
-    Env, String,
+    contract, contractimpl, contracttype, panic_with_error, symbol_short, Address, Env, String,
 };
 
 use strate_interfaces::Error;
+use strate_math::{mul_wad_down, WAD};
 
 const EXTENDED_TTL: u32 = 500_000;
 const TTL_BUMP_THRESHOLD: u32 = 100_000;
-
-// -------------------------------------------------------------------------
-// Cross-contract client into YieldStripping (used by the _update hook).
-//
-// We don't pull `yield-stripping` as a dependency to avoid a dependency
-// cycle (YS depends on YT for the YT mint cross-call in the other
-// direction). Instead we hand-declare the one method we need against a
-// stable signature.
-// -------------------------------------------------------------------------
-
-/// Subset of `IYieldStripping` exposed for the `_update` hook.
-#[contractclient(name = "YsHookClient")]
-pub trait YsHook {
-    /// Settle `user`'s accrued yield into their claimable pot and snap
-    /// their user index to the current global index. Idempotent within
-    /// one ledger.
-    fn settle_user(env: Env, user: Address);
-}
 
 // -------------------------------------------------------------------------
 // Storage layout
@@ -58,8 +66,16 @@ enum DataKey {
     Symbol,
     Decimals,
     TotalSupply,
+    /// Latest global yield index (WAD-scaled). Pushed in from YS via
+    /// `push_yield_index`. Defaults to `WAD` on construction.
+    GlobalYieldIndex,
     Balance(Address),
     Allowance(Address, Address),
+    /// Per-user snapshot of the global index as of the user's last
+    /// settle. WAD-scaled. Unset == "never settled".
+    UserYieldIndex(Address),
+    /// Per-user accrued-but-undrained yield (underlying units).
+    AccruedYield(Address),
 }
 
 /// Constructor input. Mirror of `PtInitArgs`.
@@ -90,6 +106,7 @@ impl YtToken {
         s.set(&DataKey::Symbol, &args.symbol);
         s.set(&DataKey::Decimals, &args.decimals);
         s.set(&DataKey::TotalSupply, &0_i128);
+        s.set(&DataKey::GlobalYieldIndex, &WAD);
     }
 
     /// One-shot minter bootstrap. See `pt_token::PtToken::initialize_minter`.
@@ -145,6 +162,38 @@ impl YtToken {
             .unwrap_or(0)
     }
 
+    // ---- Yield-index views ----------------------------------------------
+
+    /// Current global yield index (WAD-scaled). Source of truth for
+    /// every settle. Updated only by `push_yield_index`.
+    pub fn global_yield_index(env: Env) -> i128 {
+        env.storage()
+            .instance()
+            .get(&DataKey::GlobalYieldIndex)
+            .unwrap_or(WAD)
+    }
+
+    /// Per-user snapshot of the global index as of `user`'s last
+    /// settle. Returns 0 if `user` has never had a balance change.
+    pub fn user_yield_index(env: Env, user: Address) -> i128 {
+        read_user_yield_index(&env, &user)
+    }
+
+    /// What `user` would receive if `drain_accrued(user)` ran right
+    /// now, **without** mutating state. Combines the persisted
+    /// `AccruedYield` bucket with the not-yet-settled delta.
+    pub fn accrued_yield(env: Env, user: Address) -> i128 {
+        let global = Self::global_yield_index(env.clone());
+        let user_idx = read_user_yield_index(&env, &user);
+        let stored = read_accrued(&env, &user);
+        let bal = read_balance(&env, &user);
+        if bal <= 0 || user_idx <= 0 || global <= user_idx {
+            return stored;
+        }
+        let delta = global - user_idx;
+        stored.saturating_add(mul_wad_down(bal, delta))
+    }
+
     // ---- SEP-41 balance / transfer / allowance ---------------------------
 
     pub fn balance(env: Env, id: Address) -> i128 {
@@ -154,9 +203,15 @@ impl YtToken {
     pub fn transfer(env: Env, from: Address, to: Address, amount: i128) {
         from.require_auth();
         check_nonneg(&env, amount);
-        // Two settle_user calls — H-01 mitigation. Both run *before* the
-        // balance mutation. Self-transfer is a no-op (still settles).
-        invoke_update_hook(&env, Some(&from), Some(&to));
+        // H-01 mitigation: settle both sides locally *before* the
+        // balance mutation. Self-transfer still settles once.
+        let self_addr = env.current_contract_address();
+        if from != self_addr {
+            settle_user_local(&env, &from);
+        }
+        if to != self_addr && to != from {
+            settle_user_local(&env, &to);
+        }
         do_transfer(&env, &from, &to, amount);
         emit_transfer(&env, &from, &to, amount);
     }
@@ -165,7 +220,13 @@ impl YtToken {
         spender.require_auth();
         check_nonneg(&env, amount);
         consume_allowance(&env, &from, &spender, amount);
-        invoke_update_hook(&env, Some(&from), Some(&to));
+        let self_addr = env.current_contract_address();
+        if from != self_addr {
+            settle_user_local(&env, &from);
+        }
+        if to != self_addr && to != from {
+            settle_user_local(&env, &to);
+        }
         do_transfer(&env, &from, &to, amount);
         emit_transfer(&env, &from, &to, amount);
     }
@@ -205,16 +266,17 @@ impl YtToken {
 
     /// Mint with a fresh index snapshot.
     ///
-    /// Behaviour: invokes the `_update` hook with `from = None` (mint
-    /// from zero — no-op on the zero side) and `to = Some(to)` so the
-    /// recipient's index snapshot is set to the **current** global
-    /// index *before* the balance increments. This is the C-02
-    /// mitigation: a brand-new YT holder cannot retroactively claim
-    /// any pre-mint yield.
+    /// `to`'s settle runs before the balance increments (when `bal == 0`,
+    /// settle is a no-op for accrual but always writes the snapshot —
+    /// the C-02 line). The caller (YS) is expected to have already
+    /// pushed the current global index in via `push_yield_index`.
     pub fn mint(env: Env, to: Address, amount: i128) {
         require_minter(&env);
         check_nonneg(&env, amount);
-        invoke_update_hook(&env, None, Some(&to));
+        let self_addr = env.current_contract_address();
+        if to != self_addr {
+            settle_user_local(&env, &to);
+        }
         let new_bal = read_balance(&env, &to)
             .checked_add(amount)
             .unwrap_or_else(|| panic_with_error!(&env, Error::MathOverflow));
@@ -228,15 +290,17 @@ impl YtToken {
         emit_transfer(&env, &env.current_contract_address(), &to, amount);
     }
 
-    /// Burn from a holder. Hook is invoked with `to = None` (burn to
-    /// zero). The from-side settle credits any pending yield to the
-    /// holder's claimable balance *before* their YT balance shrinks —
-    /// so burning a position never costs yield that has already accrued
-    /// against it.
+    /// Burn from a holder. `from`'s settle runs first, so any pending
+    /// yield is credited to their accrued pot before their balance
+    /// shrinks — burning a position never costs yield that has
+    /// already accrued against it.
     pub fn burn(env: Env, from: Address, amount: i128) {
         require_minter(&env);
         check_nonneg(&env, amount);
-        invoke_update_hook(&env, Some(&from), None);
+        let self_addr = env.current_contract_address();
+        if from != self_addr {
+            settle_user_local(&env, &from);
+        }
         let bal = read_balance(&env, &from);
         if bal < amount {
             panic_with_error!(&env, Error::InsufficientBalance);
@@ -248,38 +312,93 @@ impl YtToken {
             .set(&DataKey::TotalSupply, &(supply - amount));
         emit_transfer(&env, &from, &env.current_contract_address(), amount);
     }
+
+    // ---- Yield-index minter surface -------------------------------------
+
+    /// Push a new global yield index (WAD-scaled) into YT.
+    ///
+    /// **Minter-only.** Enforces strict monotonicity: `new_index` must
+    /// be `>= GlobalYieldIndex`. A regression is rejected with
+    /// `Error::OracleRejected` because that is the kind of bug the
+    /// rate oracle would surface upstream; downstream consumers
+    /// already treat that variant as "abort the action".
+    ///
+    /// Delta-cap and oracle-staleness checks live in YS (which owns
+    /// the rate source); YT trusts its minter to have validated.
+    pub fn push_yield_index(env: Env, new_index: i128) {
+        require_minter(&env);
+        if new_index <= 0 {
+            panic_with_error!(&env, Error::OracleRejected);
+        }
+        let current = Self::global_yield_index(env.clone());
+        if new_index < current {
+            panic_with_error!(&env, Error::OracleRejected);
+        }
+        env.storage()
+            .instance()
+            .set(&DataKey::GlobalYieldIndex, &new_index);
+    }
+
+    /// Settle `user`'s pending yield into the `AccruedYield` bucket,
+    /// then zero the bucket and return the total.
+    ///
+    /// **Minter-only.** Called by YS during `claim_yield` after it has
+    /// pushed the latest global index, so the drain accounts for every
+    /// wei `user` is owed up to the call site.
+    pub fn drain_accrued(env: Env, user: Address) -> i128 {
+        require_minter(&env);
+        settle_user_local(&env, &user);
+        let stored = read_accrued(&env, &user);
+        if stored == 0 {
+            return 0;
+        }
+        let k = DataKey::AccruedYield(user.clone());
+        env.storage().persistent().set(&k, &0_i128);
+        env.storage()
+            .persistent()
+            .extend_ttl(&k, TTL_BUMP_THRESHOLD, EXTENDED_TTL);
+        stored
+    }
 }
 
 // -------------------------------------------------------------------------
-// _update hook
+// Local settle path — the H-01 mitigation under Soroban call semantics.
 // -------------------------------------------------------------------------
 
-/// Cross-contract call: invoke `settle_user(addr)` on the minter for
-/// every non-zero side of a balance change.
+/// Roll `user`'s pending yield into the `AccruedYield` bucket and snap
+/// their user index to the current global index.
 ///
-/// CRITICAL: this is the H-01 mitigation. Both `from` and `to` are
-/// settled here, *before* the balance mutation runs. The zero side
-/// (mint-from-zero, burn-to-zero) is skipped.
-fn invoke_update_hook(env: &Env, from: Option<&Address>, to: Option<&Address>) {
-    let minter_addr: Address = match env.storage().instance().get::<_, Address>(&DataKey::Minter) {
-        Some(m) => m,
-        // Pre-init no-op so test fixtures can preload balances. In
-        // production the YT is always initialised before the first
-        // `mint`.
-        None => return,
-    };
-    let client = YsHookClient::new(env, &minter_addr);
-    let self_addr = env.current_contract_address();
-    if let Some(f) = from {
-        if f != &self_addr {
-            client.settle_user(f);
+/// **CRITICAL:** the snapshot write at the end is unconditional — it
+/// runs even when the user's balance is zero. Without it, a recipient
+/// of an inbound transfer would inherit the default `0` snapshot and
+/// the next index advance would credit them retroactive yield (the
+/// H-01 bug).
+fn settle_user_local(env: &Env, user: &Address) {
+    let global = read_global_yield_index(env);
+    let user_idx = read_user_yield_index(env, user);
+    let bal = read_balance(env, user);
+
+    if bal > 0 && user_idx > 0 && global > user_idx {
+        let delta = global - user_idx;
+        let accrued = mul_wad_down(bal, delta);
+        if accrued > 0 {
+            let k = DataKey::AccruedYield(user.clone());
+            let cur: i128 = env.storage().persistent().get(&k).unwrap_or(0);
+            let new_total = cur
+                .checked_add(accrued)
+                .unwrap_or_else(|| panic_with_error!(env, Error::MathOverflow));
+            env.storage().persistent().set(&k, &new_total);
+            env.storage()
+                .persistent()
+                .extend_ttl(&k, TTL_BUMP_THRESHOLD, EXTENDED_TTL);
         }
     }
-    if let Some(t) = to {
-        if t != &self_addr {
-            client.settle_user(t);
-        }
-    }
+
+    let k = DataKey::UserYieldIndex(user.clone());
+    env.storage().persistent().set(&k, &global);
+    env.storage()
+        .persistent()
+        .extend_ttl(&k, TTL_BUMP_THRESHOLD, EXTENDED_TTL);
 }
 
 // -------------------------------------------------------------------------
@@ -314,6 +433,27 @@ fn write_balance(env: &Env, who: &Address, bal: i128) {
     env.storage()
         .persistent()
         .extend_ttl(&key, TTL_BUMP_THRESHOLD, EXTENDED_TTL);
+}
+
+fn read_global_yield_index(env: &Env) -> i128 {
+    env.storage()
+        .instance()
+        .get(&DataKey::GlobalYieldIndex)
+        .unwrap_or(WAD)
+}
+
+fn read_user_yield_index(env: &Env, user: &Address) -> i128 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::UserYieldIndex(user.clone()))
+        .unwrap_or(0)
+}
+
+fn read_accrued(env: &Env, user: &Address) -> i128 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::AccruedYield(user.clone()))
+        .unwrap_or(0)
 }
 
 fn do_transfer(env: &Env, from: &Address, to: &Address, amount: i128) {

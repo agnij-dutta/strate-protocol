@@ -48,9 +48,11 @@ fn c02_two_minters_get_equal_per_yt_yield() {
     f.ys().mint(&alice, &alice, &(1_000 * ONE_UNDERLYING));
 
     // Time passes, rate moves up.
-    strate_testutils::time::advance_by(&f.env, 30 * 86_400);
+    f.advance_days(30);
     let mock = f.mock_blend();
     mock.set_rate(&bumped_rate(mock.b_rate(), WAD / 100));
+    // Refresh the oracle cache so YS.mint can read the new rate.
+    let _ = f.oracle().try_sync_rate();
 
     // Bob mints AFTER the rate move.
     f.ys().mint(&bob, &bob, &(1_000 * ONE_UNDERLYING));

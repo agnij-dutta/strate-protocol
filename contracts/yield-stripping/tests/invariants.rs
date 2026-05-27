@@ -307,8 +307,14 @@ proptest! {
     ) {
         let env = Env::default();
         let market = near_maturity_market(&env);
-        // Position inside the lock window.
-        let target = market.maturity.saturating_sub(secs_before_maturity);
+        // Position inside the lock window. `near_maturity_market` has
+        // a tenor shorter than MARKET_LOCK_WINDOW_SECONDS (25 min vs.
+        // 30 min), so we cap the target at the current ledger to
+        // avoid rewinding the clock — `advance_to` rejects backwards
+        // moves.
+        let now = time::now(&env);
+        let raw_target = market.maturity.saturating_sub(secs_before_maturity);
+        let target = raw_target.max(now);
         time::advance_to(&env, target);
         // TODO(blockchain-developer):
         //   let amm = AmmClient::new(&env, &market.amm.unwrap());

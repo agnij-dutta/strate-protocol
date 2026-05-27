@@ -85,8 +85,8 @@
   ],
   "ledger": {
     "protocol_version": 22,
-    "sequence_number": 1,
-    "timestamp": 1700000000,
+    "sequence_number": 2,
+    "timestamp": 1700001023,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,

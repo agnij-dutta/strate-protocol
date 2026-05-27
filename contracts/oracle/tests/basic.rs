@@ -71,6 +71,12 @@ fn admin_pause_blocks_reads_and_syncs() {
     client.execute_unpause();
     assert!(!client.is_paused());
 
+    // The 48h advance pushed the cache past the staleness window
+    // (max_staleness_ledgers = 120 ledgers ≈ 10 minutes). Resync so
+    // the next read sees a fresh cache — in production a keeper does
+    // this between the unpause and the next user-facing read.
+    let _ = client.sync_rate();
+
     // Reads work again.
     let r = client.get_rate();
     assert_eq!(r, WAD);

@@ -45,7 +45,15 @@ pub fn assert_all(env: &Env, m: &Market) {
 // =========================================================================
 
 /// INV-S1 — `pt_supply == yt_supply`.
+///
+/// Only holds pre-maturity: after maturity, `redeem_pt` burns PT
+/// without touching YT (YT is worthless once the curve has expired),
+/// so the supplies diverge legitimately. Post-maturity solvency is
+/// covered by INV-S3.
 pub fn inv_s1_supply_equality(env: &Env, m: &Market) {
+    if env.ledger().timestamp() >= m.maturity {
+        return;
+    }
     let pt = m.pt_supply(env);
     let yt = m.yt_supply(env);
     assert_eq!(

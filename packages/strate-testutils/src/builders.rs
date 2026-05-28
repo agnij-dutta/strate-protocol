@@ -448,6 +448,14 @@ mod wired {
         pt_token::PtTokenClient::new(env, &pt).initialize_minter(&ys);
         yt_token::YtTokenClient::new(env, &yt).initialize_minter(&ys);
 
+        // 8b. Prime the Oracle's cache so downstream `get_rate` calls
+        // pass the staleness check. Without this, the first YS.mint
+        // (whether driven by `seed AMM liquidity` below or by an
+        // integration-test entry point) reverts with `OracleStale`
+        // because the cache is the post-construction sentinel of 0.
+        let oracle_client = strate_oracle::OracleClient::new(env, &oracle);
+        let _ = oracle_client.try_sync_rate();
+
         // 9. Seed users.
         let mut users = Map::new(env);
         for (name, balance) in &b.seeded_users {
@@ -475,13 +483,17 @@ mod wired {
                 // The provider needs PT and underlying. PT must come
                 // via the YS mint path so the minter authorization
                 // works. We mint enough underlying to cover the LP +
-                // YS mint, then mint PT+YT, then add liquidity using
-                // the PT and the spare underlying.
+                // YS mint (+ the 1000-wei DEAD_SHARES levy taken from
+                // the first deposit), then mint PT+YT, then add
+                // liquidity using the resulting PT and the spare
+                // underlying.
+                const DEAD_SHARES_WEI: i128 = 1_000;
+                let ys_mint_amount = b.initial_lp_pt.saturating_add(DEAD_SHARES_WEI);
                 let total_underlying =
-                    b.initial_lp_pt.saturating_add(b.initial_lp_underlying);
+                    ys_mint_amount.saturating_add(b.initial_lp_underlying);
                 underlying_admin.mint(&provider, &total_underlying);
                 let ys_client = yield_stripping::YieldStrippingClient::new(env, &ys);
-                let _ = ys_client.mint(&provider, &provider, &b.initial_lp_pt);
+                let _ = ys_client.mint(&provider, &provider, &ys_mint_amount);
                 let amm_client = amm::AmmContractClient::new(env, amm_addr);
                 amm_client.add_liquidity(
                     &provider,

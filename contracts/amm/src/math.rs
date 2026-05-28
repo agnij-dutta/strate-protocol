@@ -280,7 +280,16 @@ pub fn weights_at(
     let w_pt = if w_pt_raw <= 0 {
         return Ok((WAD / 2, WAD - WAD / 2));
     } else if w_pt_raw >= WAD {
-        WAD - 1
+        // `w_pt_raw >= WAD` happens when `|ln_t|` (artificially
+        // floored by the `t_frac <= WAD/2` clamp above) dwarfs the
+        // near-balanced `|ln_p_spot|`. Returning `WAD - 1` here makes
+        // `compute_swap_out`'s `weight_ratio = w_in/w_out` collapse to
+        // ~0 or ~∞, which then snaps `dx_out` to 0 and breaks every
+        // call site with `Error::InsufficientLiquidity`. Falling back
+        // to the symmetric split degrades to the constant-product
+        // form — the same fallback the `w_pt_raw <= 0` branch uses
+        // for the dual numerical regime.
+        return Ok((WAD / 2, WAD - WAD / 2));
     } else {
         w_pt_raw
     };

@@ -131,10 +131,18 @@ impl Fixture {
 
     pub fn advance_days(&self, days: u64) {
         time::advance_by(&self.env, days * 86_400);
+        // Keep the Oracle cache fresh so subsequent YS reads don't
+        // trip the staleness gate. In production a keeper would do
+        // this; in tests we fold it into the time-advance helper so
+        // individual tests don't have to remember.
+        let _ = self.oracle().try_sync_rate();
     }
 
     pub fn advance_to_maturity(&self) {
         time::advance_to(&self.env, self.market.maturity);
+        // No sync here — post-maturity the YS path doesn't read the
+        // oracle (the yield index is frozen). Tests exercising
+        // pre-maturity behaviour use `advance_days`.
     }
 
     /// Drive the Oracle one sync forward. Used between rate bumps.
@@ -159,9 +167,31 @@ pub const BLEND_ONE: i128 = 1_000_000_000;
 
 /// Convenience: bump the mock Blend rate by `rel_wad` and call both
 /// Oracle and YS sync. Used by flow tests that simulate yield accrual.
+///
+/// The mock Blend pool does not actually accrue interest on the
+/// underlying it holds — it just reports a rate. To keep the YS
+/// solvent enough to pay the yield it has just been told it owes,
+/// we top the YS up with the exact face value of the new accrual
+/// (`yt_supply * index_delta / WAD`), measured against the live
+/// global index after the sync pushes the new value. The unit
+/// tests use the same trick via `fund(&f.ys, ...)`. In production
+/// this growth comes from Blend's `b_rate` appreciation on the
+/// deposited principal.
 pub fn accrue(f: &Fixture, rel_wad: i128) {
+    let pre_index = f.ys().current_index();
     let mock = f.mock_blend();
     let r = mock.b_rate();
     mock.set_rate(&strate_testutils::mock_blend::bumped_rate(r, rel_wad));
     f.sync();
+    let post_index = f.ys().current_index();
+    let yt_supply = f.market.yt_supply(&f.env);
+    let delta_index = post_index.saturating_sub(pre_index);
+    let top_up = yt_supply.saturating_mul(delta_index) / strate_testutils::constants::WAD;
+    // Round up by 1 wei to absorb the YS↔YT muldiv-down rounding so
+    // INV-S2 has strictly enough backing.
+    let top_up = top_up + 1;
+    if top_up > 0 {
+        StellarAssetClient::new(&f.env, &f.market.underlying)
+            .mint(&f.market.yield_stripping, &top_up);
+    }
 }

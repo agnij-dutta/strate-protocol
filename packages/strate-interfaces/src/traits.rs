@@ -134,24 +134,43 @@ pub trait IPtToken {
 
 /// YT (Yield Token) entry points. Implemented by the `yt-token`
 /// contract. SEP-41 surface plus the yield-accounting hooks.
+///
+/// Post H-01 fix (see `docs/handoff/H-01-reentry-fix.md`), YT owns
+/// the global yield index and per-user accrual state directly.
+/// Soroban host 22.x forbids the cross-contract callback pattern
+/// that the original design relied on; the push topology below
+/// keeps YS and YT acyclic.
 pub trait IYtToken {
-    /// Privileged mint, supplying the index snapshot to record for
-    /// this minting batch.
-    fn mint_with_index(
-        env: Env,
-        to: Address,
-        amount: i128,
-        index_at_mint: i128,
-    ) -> Result<(), Error>;
+    /// Privileged mint. The recipient is settled against the current
+    /// global yield index *before* the balance increment.
+    fn mint(env: Env, to: Address, amount: i128) -> Result<(), Error>;
 
-    /// Privileged burn.
-    fn burn_from(env: Env, from: Address, amount: i128) -> Result<(), Error>;
+    /// Privileged burn. The holder is settled *before* the balance
+    /// decrement, so accrued yield is preserved into their drainable
+    /// bucket.
+    fn burn(env: Env, from: Address, amount: i128) -> Result<(), Error>;
 
-    /// Read the per-user yield index snapshot.
-    fn user_index(env: Env, user: Address) -> Result<i128, Error>;
+    /// Read the current global yield index (WAD-scaled).
+    fn global_yield_index(env: Env) -> Result<i128, Error>;
 
-    /// Write the per-user yield index (used by the claim path).
-    fn set_user_index(env: Env, user: Address, new_index: i128) -> Result<(), Error>;
+    /// Read the per-user yield-index snapshot (WAD-scaled). Returns 0
+    /// for accounts that have never had a balance change.
+    fn user_yield_index(env: Env, user: Address) -> Result<i128, Error>;
+
+    /// Push a new global yield index. **Minter-only.** Enforces
+    /// monotonicity (`new_index >= current`); a regression is
+    /// rejected with `OracleRejected`.
+    fn push_yield_index(env: Env, new_index: i128) -> Result<(), Error>;
+
+    /// View-only: what `user` would receive on `drain_accrued` right
+    /// now, including the not-yet-settled delta against the current
+    /// global index.
+    fn accrued_yield(env: Env, user: Address) -> Result<i128, Error>;
+
+    /// **Minter-only.** Settle `user`'s pending delta, then zero
+    /// and return their accrued-yield bucket. Atomic; the read of
+    /// `AccruedYield` and the zero-write happen in the same call.
+    fn drain_accrued(env: Env, user: Address) -> Result<i128, Error>;
 
     /// Maturity timestamp (Unix seconds).
     fn maturity(env: Env) -> Result<u64, Error>;

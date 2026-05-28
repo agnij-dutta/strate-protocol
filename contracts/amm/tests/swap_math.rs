@@ -31,13 +31,15 @@ const HALF: i128 = WAD / 2;
 
 /// Exact Uniswap V2 constant-product formula: `dx_out = x_out * dx_in /
 /// (x_in_after_fee + dx_in_after_fee)` with the input rebated by
-/// `fee_bps / 10_000`. We compute it at i128 precision since none of
-/// the test cases overflow.
+/// `fee_bps / 10_000`. The deep-pool cases push `x_out * dx_in_post`
+/// past `i128::MAX` (e.g. 1e6 * WAD * WAD = 1e42), so the multiply
+/// goes through `strate_math::muldiv_floor`, which widens the
+/// intermediate to 256 bits.
 fn uniswap_expected(x_in: i128, x_out: i128, dx_in: i128, fee_bps: u32) -> i128 {
     let fee_num = 10_000 - i128::from(fee_bps);
     let dx_in_post = dx_in * fee_num / 10_000;
     // dx_out = x_out * dx_in_post / (x_in + dx_in_post)
-    x_out * dx_in_post / (x_in + dx_in_post)
+    strate_math::muldiv_floor(x_out, dx_in_post, x_in + dx_in_post)
 }
 
 /// (x_in, x_out, dx_in, fee_bps). Balanced-weight Uniswap-equivalence vectors.
@@ -159,3 +161,4 @@ fn invalid_weights_rejected() {
     let r = compute_swap_out(100 * WAD, 100 * WAD, 10 * WAD, -1, WAD, 0);
     assert!(matches!(r, Err(Error::Math)));
 }
+

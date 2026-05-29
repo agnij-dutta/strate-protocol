@@ -136,7 +136,10 @@ pub fn write_total_lp(env: &Env, v: i128) {
 }
 
 pub fn read_total_lp(env: &Env) -> i128 {
-    env.storage().persistent().get(&DataKey::TotalLp).unwrap_or(0)
+    env.storage()
+        .persistent()
+        .get(&DataKey::TotalLp)
+        .unwrap_or(0)
 }
 
 pub fn write_lp_balance(env: &Env, who: &Address, v: i128) {
@@ -153,9 +156,7 @@ pub fn read_lp_balance(env: &Env, who: &Address) -> i128 {
 }
 
 pub fn write_last_trade_time(env: &Env, t: u64) {
-    env.storage()
-        .persistent()
-        .set(&DataKey::LastTradeTime, &t);
+    env.storage().persistent().set(&DataKey::LastTradeTime, &t);
 }
 
 pub fn read_last_trade_time(env: &Env) -> u64 {

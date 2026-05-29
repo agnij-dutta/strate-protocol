@@ -21,10 +21,14 @@ fn five_percent_jump_freezes_oracle() {
     // sync_rate returns last-good (Ok) but sets the freeze flag.
     let returned = client.sync_rate();
     assert_eq!(
-        returned, common::WAD,
+        returned,
+        common::WAD,
         "sync_rate must return last-known-good on violation"
     );
-    assert!(client.is_frozen(), "oracle should be frozen after over-cap jump");
+    assert!(
+        client.is_frozen(),
+        "oracle should be frozen after over-cap jump"
+    );
 }
 
 #[test]
@@ -40,7 +44,11 @@ fn monotonicity_violation_freezes_oracle() {
     fx.advance_time(60);
 
     let returned = client.sync_rate();
-    assert_eq!(returned, common::WAD, "monotonicity violation must preserve cached rate");
+    assert_eq!(
+        returned,
+        common::WAD,
+        "monotonicity violation must preserve cached rate"
+    );
     assert!(client.is_frozen());
 }
 

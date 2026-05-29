@@ -36,6 +36,9 @@ struct U256 {
 }
 
 impl U256 {
+    /// Additive identity. Used by the multiplication unit tests; kept on
+    /// the type as part of its small numeric API surface.
+    #[cfg_attr(not(test), allow(dead_code))]
     const ZERO: Self = Self { hi: 0, lo: 0 };
 
     /// Compute `a * b` as a 256-bit unsigned integer.
@@ -145,12 +148,7 @@ impl U256 {
 /// Returns `Err(Error::Overflow)` if the unsigned magnitude of the
 /// quotient exceeds `i128::MAX + 1` (the asymmetric boundary of two's
 /// complement), and `Err(Error::DivisionByZero)` if `denom == 0`.
-fn muldiv_signed(
-    a: i128,
-    b: i128,
-    denom: i128,
-    mode: SignedRounding,
-) -> Result<i128, Error> {
+fn muldiv_signed(a: i128, b: i128, denom: i128, mode: SignedRounding) -> Result<i128, Error> {
     if denom == 0 {
         return Err(Error::DivisionByZero);
     }

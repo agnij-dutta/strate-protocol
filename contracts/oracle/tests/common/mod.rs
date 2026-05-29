@@ -46,23 +46,13 @@ impl OracleFixture {
     /// is **not** synced; callers should `sync_rate()` themselves so the
     /// first-sync semantics are explicit per test.
     pub fn new() -> Self {
-        Self::with_config(
-            FIVE_PERCENT_WAD,
-            120,
-            32,
-            BLEND_ONE,
-        )
+        Self::with_config(FIVE_PERCENT_WAD, 120, 32, BLEND_ONE)
     }
 
     /// Tight config: 1% cap, 10-ledger staleness, 8 slots. Useful for
     /// rate-limit and staleness tests.
     pub fn tight() -> Self {
-        Self::with_config(
-            ONE_PERCENT_WAD,
-            10,
-            8,
-            BLEND_ONE,
-        )
+        Self::with_config(ONE_PERCENT_WAD, 10, 8, BLEND_ONE)
     }
 
     pub fn with_config(

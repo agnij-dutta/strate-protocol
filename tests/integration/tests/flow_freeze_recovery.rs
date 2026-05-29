@@ -23,7 +23,10 @@ fn oracle_freezes_on_huge_rate_jump() {
     // Bump the Blend rate by 50% — way above the 5% per-sync cap.
     let mock = f.mock_blend();
     let r0 = mock.b_rate();
-    mock.set_rate(&bumped_rate(r0, 500_000_000_000_000_000_i128 /* 50% WAD */));
+    mock.set_rate(&bumped_rate(
+        r0,
+        500_000_000_000_000_000_i128, /* 50% WAD */
+    ));
 
     // sync_rate should NOT propagate an Err in our implementation; it
     // returns Ok(cached_rate) and freezes the oracle as a side effect.

@@ -27,15 +27,11 @@ fn swap_output_decreases_as_maturity_approaches() {
     let pt_in = 10 * ONE;
     // Sample at three points: shortly after launch, mid-tenor, and
     // just outside the lock window.
-    let early = fx
-        .amm_client
-        .swap_exact_pt_for_sy(&fx.trader, &pt_in, &1);
+    let early = fx.amm_client.swap_exact_pt_for_sy(&fx.trader, &pt_in, &1);
 
     // Mid-tenor: half the tenor in.
     fx.advance(TENOR / 2);
-    let mid = fx
-        .amm_client
-        .swap_exact_pt_for_sy(&fx.trader, &pt_in, &1);
+    let mid = fx.amm_client.swap_exact_pt_for_sy(&fx.trader, &pt_in, &1);
 
     // Near-end but outside lock: advance to (maturity - lock - 100s).
     let to_now = fx.env.ledger().timestamp();
@@ -43,9 +39,7 @@ fn swap_output_decreases_as_maturity_approaches() {
     if target > to_now {
         fx.advance(target - to_now);
     }
-    let late = fx
-        .amm_client
-        .swap_exact_pt_for_sy(&fx.trader, &pt_in, &1);
+    let late = fx.amm_client.swap_exact_pt_for_sy(&fx.trader, &pt_in, &1);
 
     // The three swaps come from different pool states (each swap
     // changes reserves), but the dominant effect should be the weight

@@ -81,20 +81,35 @@ Each maps 1:1 to a test file:
 
 ### H-01 — YT transfer recipient stale snapshot
 - **Class**: Per-user accounting drift across token transfers.
-- **Pre-state**: User A has YT and an up-to-date `user_index_snapshot[A]`.
+- **Pre-state**: User A has YT and an up-to-date per-user yield index.
   User B has zero YT.
-- **Vector**: User A transfers YT to User B. The `_update` hook calls
-  `settle_user(A)` correctly. But if `settle_user(B)` is **not** called
-  before B's balance increments, B inherits A's transferred YT with B's
-  ancient (possibly zero / possibly default) snapshot. When the yield index
-  advances by `Δ`, B claims `Δ * yt_balance[B]` — yield that accrued before
-  B held any YT. This is the single most-commonly-missed Pendle port bug.
-- **Mitigation lever**: YT `_update` hook **must** call `settle_user` for
-  **both** `from` and `to` **before** balance mutation, on every flow that
-  changes a balance: `mint`, `burn`, `transfer`, `transfer_from`. Mint-from-
-  zero and burn-to-zero are also balance changes; zero address is settled
-  as a no-op.
-- **Test**: `attack_yt_transfer_stale_snapshot_is_mitigated`.
+- **Vector**: User A transfers YT to User B. If B's per-user index is **not**
+  settled before B's balance increments, B inherits A's transferred YT with
+  B's ancient (possibly zero / possibly default) index. When the global yield
+  index advances by `Δ`, B claims `Δ * yt_balance[B]` — yield that accrued
+  before B held any YT. This is the single most-commonly-missed Pendle port
+  bug.
+- **Mitigation (push topology, ADR-001)**: the yield index and the per-user
+  accrual buckets live **inside the YT contract**, not in YieldStripping (YS).
+  Every balance-changing path (`mint`, `burn`, `transfer`, `transfer_from`)
+  settles **both** `from` and `to` **before** the balance mutates by reading
+  YT's own storage — there is no cross-contract call. Mint-from-zero and
+  burn-to-zero are settled as no-ops on the zero address. YS pushes the new
+  global index to YT on `sync()` and pulls a user's settled bucket via
+  `drain_accrued()` on `claim()`.
+
+  This design is a deliberate change from the original spec, which had YT
+  call back into `YS.settle_user(addr)` from its `_update` hook. Soroban's
+  host **forbids contract re-entry** (`Error(Context, InvalidAction)`: "Contract
+  re-entry is not allowed"), so the callback could never execute on-chain. The
+  push topology removes the callback entirely while strengthening the
+  guarantee — both settlements are now atomic within YT, before any balance
+  moves, with no inter-contract surface for a reentrant settle to slip through.
+  See `docs/handoff/H-01-reentry-fix.md` for the migration record and PR #2.
+- **Tests**: `attack_yt_transfer_stale_snapshot_is_mitigated`,
+  `yt_transfer_recipient_does_not_get_stale_yield`,
+  `yt_burn_credits_accrued_before_balance_decrement`,
+  `yt_self_transfer_is_noop`.
 
 ## 2. Surface attacks (10 additional vectors)
 

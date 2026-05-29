@@ -70,7 +70,10 @@ fn cancel_reattest_clears_proposal() {
 
     fx.advance_time(TIMELOCK_SECS + 1);
     let r = flatten(client.try_execute_reattest());
-    assert!(r.is_err(), "execute_reattest must fail with no pending proposal");
+    assert!(
+        r.is_err(),
+        "execute_reattest must fail with no pending proposal"
+    );
     assert!(client.is_frozen(), "cancellation must not unfreeze");
 }
 

@@ -24,8 +24,12 @@ pub trait IYieldStripping {
     /// Deposit underlying, mint matching PT and YT to `to`.
     ///
     /// Returns `(pt_minted, yt_minted, index_at_mint)`.
-    fn mint(env: Env, from: Address, to: Address, amount: i128)
-        -> Result<(i128, i128, i128), Error>;
+    fn mint(
+        env: Env,
+        from: Address,
+        to: Address,
+        amount: i128,
+    ) -> Result<(i128, i128, i128), Error>;
 
     /// Pre-maturity: burn equal PT+YT, withdraw underlying. The user
     /// can also call this post-maturity but it's gas-inefficient

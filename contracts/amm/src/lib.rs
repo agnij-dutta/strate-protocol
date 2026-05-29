@@ -395,12 +395,7 @@ impl AmmContract {
 
     /// Swap exact PT for underlying. Locked inside the near-maturity
     /// window. Reverts on slippage.
-    pub fn swap_exact_pt_for_sy(
-        env: Env,
-        trader: Address,
-        pt_in: i128,
-        min_sy_out: i128,
-    ) -> i128 {
+    pub fn swap_exact_pt_for_sy(env: Env, trader: Address, pt_in: i128, min_sy_out: i128) -> i128 {
         trader.require_auth();
         check_not_paused(&env);
         check_pre_maturity(&env);
@@ -432,7 +427,9 @@ impl AmmContract {
             panic_with_error!(&env, Error::InsufficientLiquidity);
         }
 
-        let new_x_pt = x_pt.checked_add(pt_in).unwrap_or_else(|| panic_with_error!(&env, Error::MathOverflow));
+        let new_x_pt = x_pt
+            .checked_add(pt_in)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::MathOverflow));
         let new_x_under = x_under - dx_under;
 
         // Effects.
@@ -477,12 +474,7 @@ impl AmmContract {
     /// **TODO(post-v1):** add `swap_sy_for_exact_pt` proper with Newton
     /// solver once it is needed by the front-end. For now, callers
     /// asking for an exact-PT-out can rely on quote → adjust → submit.
-    pub fn swap_sy_for_exact_pt(
-        env: Env,
-        trader: Address,
-        sy_in: i128,
-        min_pt_out: i128,
-    ) -> i128 {
+    pub fn swap_sy_for_exact_pt(env: Env, trader: Address, sy_in: i128, min_pt_out: i128) -> i128 {
         trader.require_auth();
         check_not_paused(&env);
         check_pre_maturity(&env);
@@ -514,7 +506,9 @@ impl AmmContract {
             panic_with_error!(&env, Error::InsufficientLiquidity);
         }
 
-        let new_x_under = x_under.checked_add(sy_in).unwrap_or_else(|| panic_with_error!(&env, Error::MathOverflow));
+        let new_x_under = x_under
+            .checked_add(sy_in)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::MathOverflow));
         let new_x_pt = x_pt - dx_pt;
 
         storage::write_reserves(&env, new_x_pt, new_x_under);
@@ -695,11 +689,12 @@ fn compute_spot_implied_rate(x_pt: i128, x_under: i128, cfg: &AmmConfig) -> i128
     if x_pt <= 0 || x_under <= 0 {
         return 0;
     }
-    let sum = match x_pt.checked_add(x_under) {
-        Some(v) if v > 0 => v,
-        _ => return 0,
-    };
-    // p = x_under / sum, q = 1 - p = x_pt / sum.
+    // Reject reserves whose sum overflows i128 — pathological, but the
+    // guard is cheap and keeps the ratio below well-defined.
+    if x_pt.checked_add(x_under).is_none() {
+        return 0;
+    }
+    // p = x_under / (x_pt + x_under), q = 1 - p = x_pt / (x_pt + x_under).
     // implied_rate = scalar_root * (p / q) = scalar_root * (x_under / x_pt).
     // Use floor — implied rate is a fairness/quote, half-even bias
     // here would not change behaviour materially.

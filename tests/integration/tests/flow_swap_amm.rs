@@ -22,12 +22,9 @@ fn swap_pt_for_underlying_basic() {
     // The AMM expects PT and underlying; we have PT from the mint and
     // some leftover underlying. Seed the pool first.
     f.fund(&alice, 1_000 * ONE_UNDERLYING);
-    let lp = f.amm().add_liquidity(
-        &alice,
-        &(500 * ONE_UNDERLYING),
-        &(500 * ONE_UNDERLYING),
-        &1,
-    );
+    let lp = f
+        .amm()
+        .add_liquidity(&alice, &(500 * ONE_UNDERLYING), &(500 * ONE_UNDERLYING), &1);
     assert!(lp > 0);
 
     // Snapshot pt_supply before swap (should be unchanged by swap).
@@ -37,9 +34,7 @@ fn swap_pt_for_underlying_basic() {
     // underlying out.
     let pt_in = 100 * ONE_UNDERLYING;
     let pre_under = f.underlying_balance(&alice);
-    let out = f
-        .amm()
-        .swap_exact_pt_for_sy(&alice, &pt_in, &1);
+    let out = f.amm().swap_exact_pt_for_sy(&alice, &pt_in, &1);
     assert!(out > 0, "swap returned zero output");
     let post_under = f.underlying_balance(&alice);
     assert_eq!(post_under - pre_under, out);
@@ -60,18 +55,16 @@ fn swap_slippage_guard_reverts() {
     f.fund(&alice, 2_000 * ONE_UNDERLYING);
     f.ys().mint(&alice, &alice, &(2_000 * ONE_UNDERLYING));
     f.fund(&alice, 1_000 * ONE_UNDERLYING);
-    f.amm().add_liquidity(
-        &alice,
-        &(500 * ONE_UNDERLYING),
-        &(500 * ONE_UNDERLYING),
-        &1,
-    );
+    f.amm()
+        .add_liquidity(&alice, &(500 * ONE_UNDERLYING), &(500 * ONE_UNDERLYING), &1);
 
     // Quote a swap first to find a realistic min_out, then ask for 10x
     // that as min_out — should revert with SlippageExceeded.
     let pt_in = 100 * ONE_UNDERLYING;
     let absurd_min = pt_in * 10;
-    let r = f.amm().try_swap_exact_pt_for_sy(&alice, &pt_in, &absurd_min);
+    let r = f
+        .amm()
+        .try_swap_exact_pt_for_sy(&alice, &pt_in, &absurd_min);
     assert!(r.is_err() || matches!(r, Ok(Err(_))), "swap must revert");
 }
 
@@ -90,21 +83,15 @@ fn amm_lock_window_blocks_swap() {
     f.fund(&alice, 2_000 * ONE_UNDERLYING);
     f.ys().mint(&alice, &alice, &(2_000 * ONE_UNDERLYING));
     f.fund(&alice, 1_000 * ONE_UNDERLYING);
-    f.amm().add_liquidity(
-        &alice,
-        &(500 * ONE_UNDERLYING),
-        &(500 * ONE_UNDERLYING),
-        &1,
-    );
+    f.amm()
+        .add_liquidity(&alice, &(500 * ONE_UNDERLYING), &(500 * ONE_UNDERLYING), &1);
 
     // Position 15 minutes before maturity — inside the 30-min lock.
     strate_testutils::time::advance_to(&f.env, f.market.maturity - 15 * 60);
 
-    let r = f.amm().try_swap_exact_pt_for_sy(
-        &alice,
-        &(10 * ONE_UNDERLYING),
-        &1,
-    );
+    let r = f
+        .amm()
+        .try_swap_exact_pt_for_sy(&alice, &(10 * ONE_UNDERLYING), &1);
     assert!(
         r.is_err() || matches!(r, Ok(Err(_))),
         "lock window must block swap"
@@ -126,12 +113,9 @@ fn amm_remove_liquidity_works_inside_lock_window() {
     f.fund(&alice, 2_000 * ONE_UNDERLYING);
     f.ys().mint(&alice, &alice, &(2_000 * ONE_UNDERLYING));
     f.fund(&alice, 1_000 * ONE_UNDERLYING);
-    let lp = f.amm().add_liquidity(
-        &alice,
-        &(500 * ONE_UNDERLYING),
-        &(500 * ONE_UNDERLYING),
-        &1,
-    );
+    let lp = f
+        .amm()
+        .add_liquidity(&alice, &(500 * ONE_UNDERLYING), &(500 * ONE_UNDERLYING), &1);
     strate_testutils::time::advance_to(&f.env, f.market.maturity - 15 * 60);
 
     let (pt_out, under_out) = f.amm().remove_liquidity(&alice, &(lp / 2), &1, &1);

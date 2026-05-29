@@ -19,8 +19,7 @@ const HALF: i128 = WAD / 2;
 fn fee_strictly_reduces_output_for_nonzero_fee() {
     let no_fee = compute_swap_out(100 * WAD, 100 * WAD, 10 * WAD, HALF, HALF, 0).unwrap();
     for fee in [1u32, 30, 100] {
-        let with_fee =
-            compute_swap_out(100 * WAD, 100 * WAD, 10 * WAD, HALF, HALF, fee).unwrap();
+        let with_fee = compute_swap_out(100 * WAD, 100 * WAD, 10 * WAD, HALF, HALF, fee).unwrap();
         assert!(with_fee < no_fee, "fee={fee} did not reduce output");
     }
 }
@@ -52,7 +51,10 @@ fn protocol_keeps_fee_wei_on_round_trip() {
 
     // After the round-trip, attacker holds < initial_pt of PT and 0 of
     // underlying. Difference = fees retained in the pool.
-    assert!(pt_back < initial_pt, "pt_back={pt_back} initial_pt={initial_pt}");
+    assert!(
+        pt_back < initial_pt,
+        "pt_back={pt_back} initial_pt={initial_pt}"
+    );
     let fee_kept = initial_pt - pt_back;
     // Conservative lower bound: roughly 2 * fee_bps of the trade size
     // (one fee each leg, compounded through the curve). 30 bps each

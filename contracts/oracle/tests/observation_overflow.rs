@@ -30,7 +30,10 @@ fn ring_buffer_evicts_oldest_after_overflow() {
     // TWAP = average of #69..=#99 = (69 + 99) / 2 * WAD = 84 * WAD.
     let twap = client.get_twap();
     let expected = 84 * WAD;
-    assert_eq!(twap, expected, "TWAP must reflect the 32 most-recent samples only");
+    assert_eq!(
+        twap, expected,
+        "TWAP must reflect the 32 most-recent samples only"
+    );
 }
 
 #[test]

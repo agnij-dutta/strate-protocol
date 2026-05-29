@@ -6,12 +6,21 @@ Rust test that checks it. Invariants are checked at the boundaries of every
 state-changing entrypoint (`#[invariant_check]` wrapper in the contract) and
 also as proptest properties in the test crate.
 
+> **Topology note (2026-05-29):** per ADR-001's push-topology amendment, the
+> global yield index and the per-user index/accrual buckets live **inside the
+> YT contract**, not YieldStripping. `yield_index` and `user_index_snapshot`
+> below refer to YT-owned state. YS keeps the global index fresh via
+> `YT.push_yield_index()` and reads settled buckets via `YT.drain_accrued()`.
+> All invariants below are re-verified against this topology and continue to
+> hold; INV-U1/U2 are annotated where the storage owner matters.
+
 Notation:
 - `Σ` denotes sum over a set (clarified at use site).
 - `now` is `env.ledger().timestamp()`.
 - All balances/supplies are `i128` in token-native decimals unless tagged WAD.
-- `idx_t` is `yield_index(t)`, the cumulative-yield index at time t.
-- `snap_u` is `user_index_snapshot[u]`, the last index at which u settled.
+- `idx_t` is `yield_index(t)`, the cumulative-yield index at time t (YT-owned).
+- `snap_u` is `user_index_snapshot[u]`, the last index at which u settled
+  (YT-owned, advanced by YT's local settle on every balance change).
 
 ---
 
@@ -168,12 +177,20 @@ Constant: `N_BLOCKS_BEFORE_MATURITY = 30 minutes`. Drives C-03 mitigation.
 For every operation that changes yt_balance(u):
   POST: user_index_snapshot[u] == global_yield_index(POST_TIME)
 ```
-The `_update` hook in the YT contract calls `settle_user(from)` and
-`settle_user(to)` **before** the balance mutation; both snapshots are then
-equal to the just-synced index. This is the C-02 / H-01 mitigation.
+**Push topology (amended):** YT settles `from` and `to` **locally** (reading
+its own storage) **before** the balance mutation, on every balance-changing
+path (`mint`, `burn`, `transfer`, `transfer_from`). There is no callback into
+YS. Freshness of `global_yield_index` is guaranteed because YS calls
+`YT.push_yield_index()` before any mint/burn/claim, so the index YT settles
+against is current as of POST_TIME. Both touched snapshots then equal that
+index. This is the C-02 / H-01 mitigation, and it is strictly stronger than
+the superseded callback design: settlement is atomic in-contract with no
+inter-contract surface for a reentrant settle to bypass.
 
 **Test**: `proptest_yt_transfer_snapshot`,
-`attack_yt_transfer_stale_snapshot_is_mitigated`.
+`attack_yt_transfer_stale_snapshot_is_mitigated`,
+`yt_transfer_recipient_does_not_get_stale_yield`,
+`yt_burn_credits_accrued_before_balance_decrement`.
 
 ### INV-U2 — Snapshot never exceeds global index
 ```
@@ -208,8 +225,8 @@ paused == true ⇒ all state-changing entrypoints revert
 | ADR-001 rule                                | Enforces       |
 |---------------------------------------------|----------------|
 | §1 Immutable address binding                | INV-L1         |
-| §2 Forbidden call edges                     | INV-S1, INV-NFL|
-| §3 YT `_update` hook                        | INV-U1, INV-NFL|
+| §2 Forbidden call edges (incl. removed YT→YS) | INV-S1, INV-NFL|
+| §3 YT-local settlement (push topology)      | INV-U1, INV-NFL|
 | §4 Oracle freshness rule                    | INV-M2, INV-A2 |
 | §5 CEI ordering                             | INV-S4, INV-NFL|
 

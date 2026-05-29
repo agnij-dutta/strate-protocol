@@ -25,7 +25,10 @@ fn a01_oracle_freezes_on_blend_spike() {
     // Simulate a 50% spike from the attacker.
     let mock = f.mock_blend();
     let r0 = mock.b_rate();
-    mock.set_rate(&bumped_rate(r0, 500_000_000_000_000_000_i128 /* 50% WAD */));
+    mock.set_rate(&bumped_rate(
+        r0,
+        500_000_000_000_000_000_i128, /* 50% WAD */
+    ));
 
     // sync_rate freezes silently.
     let _ = f.oracle().try_sync_rate();
@@ -44,7 +47,10 @@ fn a01_below_threshold_jump_is_accepted() {
 
     let mock = f.mock_blend();
     let r0 = mock.b_rate();
-    mock.set_rate(&bumped_rate(r0, 40_000_000_000_000_000_i128 /* 4% WAD */));
+    mock.set_rate(&bumped_rate(
+        r0,
+        40_000_000_000_000_000_i128, /* 4% WAD */
+    ));
 
     let r = f.oracle().sync_rate();
     assert!(r > 0);
@@ -61,7 +67,10 @@ fn a01_repeated_max_delta_syncs_advance_smoothly() {
     let mock = f.mock_blend();
     for _ in 0..10 {
         let r0 = mock.b_rate();
-        mock.set_rate(&bumped_rate(r0, 45_000_000_000_000_000_i128 /* 4.5% */));
+        mock.set_rate(&bumped_rate(
+            r0,
+            45_000_000_000_000_000_i128, /* 4.5% */
+        ));
         let _ = f.oracle().sync_rate();
         assert!(!f.oracle().is_frozen());
     }

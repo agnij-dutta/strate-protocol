@@ -122,6 +122,9 @@ mod tests {
         let env = Env::default();
         let maturity = 100_000_u64;
         let boundary = advance_to_amm_lock_boundary(&env, maturity);
-        assert_eq!(boundary, maturity - crate::constants::MARKET_LOCK_WINDOW_SECONDS);
+        assert_eq!(
+            boundary,
+            maturity - crate::constants::MARKET_LOCK_WINDOW_SECONDS
+        );
     }
 }

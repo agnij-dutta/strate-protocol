@@ -43,7 +43,7 @@ fn ten_thousand_tiny_swap_pairs_do_not_drain_attacker() {
         // zero.
         let r1 = fx.amm_client.try_swap_exact_pt_for_sy(&fx.trader, &1, &0);
         let _ = r1; // ignore — either succeeded with 0/1 wei out, or reverted.
-        // Underlying -> PT, 1 wei in.
+                    // Underlying -> PT, 1 wei in.
         let r2 = fx.amm_client.try_swap_sy_for_exact_pt(&fx.trader, &1, &0);
         let _ = r2;
     }

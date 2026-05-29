@@ -22,7 +22,10 @@ fn flash_doubling_attack_is_mitigated() {
     fx.advance_time(1);
 
     let returned = client.sync_rate();
-    assert_eq!(returned, pre, "sync must return last-known-good on rejection");
+    assert_eq!(
+        returned, pre,
+        "sync must return last-known-good on rejection"
+    );
     assert!(client.is_frozen(), "oracle must be frozen after rejection");
 
     // The cached rate is unchanged — last-known-good preserved.

@@ -192,4 +192,3 @@ mod tests {
         assert_eq!(exp_wad_checked(-50 * WAD), Err(Error::ExpOutOfDomain));
     }
 }
-

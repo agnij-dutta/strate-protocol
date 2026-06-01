@@ -62,16 +62,15 @@
 
 use soroban_sdk::{
     contract, contractimpl, contracttype, panic_with_error, symbol_short, xdr::ToXdr, Address,
-    Bytes, BytesN, Env, IntoVal, String, Symbol, Val, Vec,
+    Bytes, BytesN, Env, IntoVal, Symbol, Val, Vec,
 };
 
 use strate_interfaces::Error;
 
-// child contract typed configs
-use pt_token::PtInitArgs;
-use strate_oracle::OracleConfig;
-use yield_stripping::Config as YsConfig;
-use yt_token::YtInitArgs;
+// Constructor arg structs come from the shared types crate. See ADR-001
+// and the docstring on packages/strate-types for why the factory cannot
+// import from the child contract crates directly.
+use strate_types::{OracleConfig, PtInitArgs, YsConfig, YtInitArgs};
 
 // =========================================================================
 // Constants
@@ -116,27 +115,10 @@ const TOPIC_UPGRADE: Symbol = symbol_short!("upgrade");
 // `contracttype` structs. The wire format is `Map<Symbol, Val>` keyed by
 // field name, which the SDK serializes losslessly across the host boundary.
 
-/// Oracle configuration forwarded to `Oracle::__constructor`.
-#[contracttype]
-#[derive(Clone)]
-pub struct OracleParams {
-    pub max_delta_per_sync_wad: i128,
-    pub max_staleness_ledgers: u32,
-    pub observation_window: u32,
-}
-
-/// PT + YT cosmetic metadata. The token decimals must match the underlying
-/// asset; PT and YT share it intentionally so 1 PT + 1 YT redeems 1 U at
-/// maturity with no scale conversion.
-#[contracttype]
-#[derive(Clone)]
-pub struct TokenMetadata {
-    pub pt_name: String,
-    pub pt_symbol: String,
-    pub yt_name: String,
-    pub yt_symbol: String,
-    pub decimals: u32,
-}
+// Both bundle types live in `strate-types`. Re-exported here under the
+// historical names so existing call sites (tests, integration harness,
+// dApp typings) keep their import paths.
+pub use strate_types::{OracleParams, TokenMetadata};
 
 // -- Per-contract salt XOR masks. Constants are intentionally distinct
 // byte patterns; their only requirement is pairwise inequality so the

@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 soroban-sdk = { workspace = true }
 strate-interfaces = { workspace = true }
 strate-math = { workspace = true }
+strate-types = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

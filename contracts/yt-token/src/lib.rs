@@ -78,16 +78,10 @@ enum DataKey {
     AccruedYield(Address),
 }
 
-/// Constructor input. Mirror of `PtInitArgs`.
-#[contracttype]
-#[derive(Clone)]
-pub struct YtInitArgs {
-    pub underlying: Address,
-    pub maturity: u64,
-    pub name: String,
-    pub symbol: String,
-    pub decimals: u32,
-}
+/// Constructor input. Mirror of `PtInitArgs`. Re-exported from
+/// [`strate_types::YtInitArgs`] so the wire format is shared with the
+/// Factory.
+pub use strate_types::YtInitArgs;
 
 // -------------------------------------------------------------------------
 // Contract

@@ -12,18 +12,25 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 soroban-sdk = { workspace = true }
 strate-interfaces = { workspace = true }
-# Factory pulls the five contract crates as rlib deps so it can use their
-# typed `__constructor` arg structs directly. This avoids the brittle
-# manual `Map<Symbol, Val>` encoding the alternative would require.
-pt-token = { path = "../pt-token" }
-yt-token = { path = "../yt-token" }
-amm = { path = "../amm" }
-strate-oracle = { path = "../oracle" }
-yield-stripping = { path = "../yield-stripping" }
+# Factory imports the constructor arg structs from `strate-types` rather
+# than from each child crate's rlib half. The earlier design pulled in
+# pt-token / yt-token / amm / strate-oracle / yield-stripping directly,
+# but that also pulled in their cdylib halves at wasm32 link time, which
+# collided on the `__constructor` symbol export. `strate-types` is a
+# pure-rlib types crate; depending on it gives us the wire format
+# without the linker conflict.
+strate-types = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 strate-testutils = { workspace = true, features = ["mock-blend"] }
+# Tests reach into PT/YT client surfaces directly to verify the
+# constructor-bind ordering. Pulling these in as dev-only deps keeps
+# the production wasm build of strate-factory free of their cdylib
+# halves (which is what caused the original __constructor symbol
+# collision before the strate-types refactor).
+pt-token = { path = "../pt-token" }
+yt-token = { path = "../yt-token" }
 
 [features]
 # Enable include_bytes! of the five pre-built WASMs into the test

@@ -1091,6 +1091,7 @@ dependencies = [
  "strate-interfaces",
  "strate-math",
  "strate-testutils",
+ "strate-types",
 ]
 
 [[package]]
@@ -1673,13 +1674,11 @@ dependencies = [
 name = "strate-factory"
 version = "0.1.0"
 dependencies = [
- "amm",
  "pt-token",
  "soroban-sdk",
  "strate-interfaces",
- "strate-oracle",
  "strate-testutils",
- "yield-stripping",
+ "strate-types",
  "yt-token",
 ]
 
@@ -1722,6 +1721,7 @@ dependencies = [
  "strate-interfaces",
  "strate-math",
  "strate-testutils",
+ "strate-types",
 ]
 
 [[package]]
@@ -1738,6 +1738,13 @@ dependencies = [
  "strate-oracle",
  "yield-stripping",
  "yt-token",
+]
+
+[[package]]
+name = "strate-types"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
 ]
 
 [[package]]
@@ -2204,6 +2211,7 @@ dependencies = [
  "strate-interfaces",
  "strate-math",
  "strate-testutils",
+ "strate-types",
  "yt-token",
 ]
 
@@ -2215,6 +2223,7 @@ dependencies = [
  "strate-interfaces",
  "strate-math",
  "strate-testutils",
+ "strate-types",
 ]
 
 [[package]]

@@ -1,0 +1,13 @@
+[package]
+name = "mock-blend"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Deployable mock Blend pool — testnet-only stand-in for the real Blend pool that returns a settable b_rate and ReserveData shape compatible with strate-oracle."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }

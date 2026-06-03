@@ -45,17 +45,15 @@ fn c03_swap_works_30min1s_before_maturity() {
     f.fund(&alice, 5_000 * ONE_UNDERLYING);
     f.ys().mint(&alice, &alice, &(5_000 * ONE_UNDERLYING));
     f.fund(&alice, 1_000 * ONE_UNDERLYING);
-    f.amm().add_liquidity(
-        &alice,
-        &(500 * ONE_UNDERLYING),
-        &(500 * ONE_UNDERLYING),
-        &1,
-    );
+    f.amm()
+        .add_liquidity(&alice, &(500 * ONE_UNDERLYING), &(500 * ONE_UNDERLYING), &1);
 
     // 30 min 30 sec before maturity → just outside the 30-min lock.
     let target = f.market.maturity - 30 * 60 - 30;
     strate_testutils::time::advance_to(&f.env, target);
 
-    let r = f.amm().try_swap_exact_pt_for_sy(&alice, &(10 * ONE_UNDERLYING), &1);
+    let r = f
+        .amm()
+        .try_swap_exact_pt_for_sy(&alice, &(10 * ONE_UNDERLYING), &1);
     assert!(r.is_ok(), "swap outside lock window must succeed: {r:?}");
 }

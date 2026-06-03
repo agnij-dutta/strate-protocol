@@ -161,4 +161,3 @@ fn invalid_weights_rejected() {
     let r = compute_swap_out(100 * WAD, 100 * WAD, 10 * WAD, -1, WAD, 0);
     assert!(matches!(r, Err(Error::Math)));
 }
-

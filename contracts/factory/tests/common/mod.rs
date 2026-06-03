@@ -94,21 +94,15 @@ pub fn make_token_meta(
 
 #[cfg(feature = "test-wasm")]
 mod wasm_bytes {
-    pub const ORACLE_WASM: &[u8] = include_bytes!(
-        "../../../../target/wasm32v1-none/release/strate_oracle.wasm"
-    );
-    pub const PT_WASM: &[u8] = include_bytes!(
-        "../../../../target/wasm32v1-none/release/pt_token.wasm"
-    );
-    pub const YT_WASM: &[u8] = include_bytes!(
-        "../../../../target/wasm32v1-none/release/yt_token.wasm"
-    );
-    pub const AMM_WASM: &[u8] = include_bytes!(
-        "../../../../target/wasm32v1-none/release/amm.wasm"
-    );
-    pub const YS_WASM: &[u8] = include_bytes!(
-        "../../../../target/wasm32v1-none/release/yield_stripping.wasm"
-    );
+    pub const ORACLE_WASM: &[u8] =
+        include_bytes!("../../../../target/wasm32v1-none/release/strate_oracle.wasm");
+    pub const PT_WASM: &[u8] =
+        include_bytes!("../../../../target/wasm32v1-none/release/pt_token.wasm");
+    pub const YT_WASM: &[u8] =
+        include_bytes!("../../../../target/wasm32v1-none/release/yt_token.wasm");
+    pub const AMM_WASM: &[u8] = include_bytes!("../../../../target/wasm32v1-none/release/amm.wasm");
+    pub const YS_WASM: &[u8] =
+        include_bytes!("../../../../target/wasm32v1-none/release/yield_stripping.wasm");
 }
 
 /// Fixture: a Factory wired with the five real-contract WASMs.
@@ -227,18 +221,8 @@ impl FactoryFixture {
 // -------------------------------------------------------------------------
 
 #[cfg(feature = "test-wasm")]
-fn install_wasms(
-    env: &Env,
-) -> (
-    BytesN<32>,
-    BytesN<32>,
-    BytesN<32>,
-    BytesN<32>,
-    BytesN<32>,
-) {
-    let oracle = env
-        .deployer()
-        .upload_contract_wasm(wasm_bytes::ORACLE_WASM);
+fn install_wasms(env: &Env) -> (BytesN<32>, BytesN<32>, BytesN<32>, BytesN<32>, BytesN<32>) {
+    let oracle = env.deployer().upload_contract_wasm(wasm_bytes::ORACLE_WASM);
     let pt = env.deployer().upload_contract_wasm(wasm_bytes::PT_WASM);
     let yt = env.deployer().upload_contract_wasm(wasm_bytes::YT_WASM);
     let amm = env.deployer().upload_contract_wasm(wasm_bytes::AMM_WASM);
@@ -252,15 +236,7 @@ fn install_wasms(
 /// check --package strate-factory` succeed on a fresh clone before
 /// anyone has run `stellar contract build`.
 #[cfg(not(feature = "test-wasm"))]
-fn install_wasms(
-    _env: &Env,
-) -> (
-    BytesN<32>,
-    BytesN<32>,
-    BytesN<32>,
-    BytesN<32>,
-    BytesN<32>,
-) {
+fn install_wasms(_env: &Env) -> (BytesN<32>, BytesN<32>, BytesN<32>, BytesN<32>, BytesN<32>) {
     panic!(
         "Factory tests require pre-built WASM artifacts. Run:\n\
          \n\

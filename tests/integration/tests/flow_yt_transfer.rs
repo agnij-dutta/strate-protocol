@@ -57,7 +57,10 @@ fn yt_transfer_recipient_does_not_get_stale_yield() {
         (alice_pending_after - alice_pending_before).abs() <= 1,
         "alice_after={alice_pending_after} before={alice_pending_before}"
     );
-    assert_eq!(bob_pending_after, 0, "bob got stale yield: {bob_pending_after}");
+    assert_eq!(
+        bob_pending_after, 0,
+        "bob got stale yield: {bob_pending_after}"
+    );
 
     // 4. Another 30 days, +2% rate.
     f.advance_days(30);
@@ -90,8 +93,7 @@ fn yt_self_transfer_is_noop() {
     f.ys().mint(&alice, &alice, &(1_000 * ONE_UNDERLYING));
     let bal_pre = f.yt_balance(&alice);
 
-    yt_token::YtTokenClient::new(&f.env, &f.market.yt)
-        .transfer(&alice, &alice, &(bal_pre / 4));
+    yt_token::YtTokenClient::new(&f.env, &f.market.yt).transfer(&alice, &alice, &(bal_pre / 4));
 
     let bal_post = f.yt_balance(&alice);
     assert_eq!(bal_pre, bal_post, "self-transfer changed balance");

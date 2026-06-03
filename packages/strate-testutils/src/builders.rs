@@ -35,7 +35,6 @@
 #![allow(clippy::too_many_lines)]
 
 use soroban_sdk::{Address, Env, Map, String, Symbol};
-use soroban_sdk::testutils::{Address as _, Ledger as _};
 
 use crate::constants::{DEFAULT_TENOR_SECONDS, ONE_UNDERLYING};
 
@@ -179,7 +178,7 @@ impl MarketBuilder {
     /// Materialise the market.
     #[cfg(not(feature = "wired"))]
     pub fn build(self, env: &Env) -> Market {
-        use soroban_sdk::testutils::Address as _;
+        use soroban_sdk::testutils::{Address as _, Ledger as _};
         let now = self.now;
         let tenor = self.tenor_seconds;
         env.ledger().with_mut(|li| {
@@ -324,7 +323,6 @@ impl Market {
 #[cfg(feature = "wired")]
 mod wired {
     use super::{Market, MarketBuilder};
-    use crate::constants::ONE_UNDERLYING;
     use soroban_sdk::testutils::{Address as _, Ledger as _};
     use soroban_sdk::token::StellarAssetClient;
     use soroban_sdk::{Address, BytesN, Env, Map, String};
@@ -410,8 +408,8 @@ mod wired {
         // For near-maturity markets the AMM constructor will revert; we
         // skip AMM deployment if the requested tenor is below that
         // floor.
-        let amm = if b.tenor_seconds > amm::MIN_TOTAL_DURATION_SECONDS
-            + amm::MARKET_LOCK_WINDOW_SECONDS
+        let amm = if b.tenor_seconds
+            > amm::MIN_TOTAL_DURATION_SECONDS + amm::MARKET_LOCK_WINDOW_SECONDS
         {
             Some(env.register(
                 amm::AmmContract,
@@ -489,18 +487,12 @@ mod wired {
                 // underlying.
                 const DEAD_SHARES_WEI: i128 = 1_000;
                 let ys_mint_amount = b.initial_lp_pt.saturating_add(DEAD_SHARES_WEI);
-                let total_underlying =
-                    ys_mint_amount.saturating_add(b.initial_lp_underlying);
+                let total_underlying = ys_mint_amount.saturating_add(b.initial_lp_underlying);
                 underlying_admin.mint(&provider, &total_underlying);
                 let ys_client = yield_stripping::YieldStrippingClient::new(env, &ys);
                 let _ = ys_client.mint(&provider, &provider, &ys_mint_amount);
                 let amm_client = amm::AmmContractClient::new(env, amm_addr);
-                amm_client.add_liquidity(
-                    &provider,
-                    &b.initial_lp_pt,
-                    &b.initial_lp_underlying,
-                    &1,
-                );
+                amm_client.add_liquidity(&provider, &b.initial_lp_pt, &b.initial_lp_underlying, &1);
             }
         }
 

@@ -235,7 +235,9 @@ impl Oracle {
             .set(&DataKey::ObservationCount, &0_u32);
         // Set CachedRate to a sentinel of 0; downstream code treats 0 as
         // "not yet synced" and skips the monotonicity check on first sync.
-        env.storage().persistent().set(&DataKey::CachedRate, &0_i128);
+        env.storage()
+            .persistent()
+            .set(&DataKey::CachedRate, &0_i128);
         env.storage()
             .persistent()
             .set(&DataKey::CachedRateAt, &0_u64);
@@ -288,8 +290,8 @@ impl Oracle {
 
             // Per-sync relative delta cap.
             let delta = new_rate - cached_rate;
-            let delta_wad = div_wad_checked(delta, cached_rate)
-                .map_err(|_| Error::OracleRejected)?;
+            let delta_wad =
+                div_wad_checked(delta, cached_rate).map_err(|_| Error::OracleRejected)?;
             if delta_wad > cfg.max_delta_per_sync_wad {
                 freeze(&env);
                 emit_freeze(&env, FreezeReason::Delta, new_rate, cached_rate);
@@ -354,12 +356,14 @@ impl Oracle {
         bump_persistent(&env, &DataKey::ObservationHead);
         bump_persistent(&env, &DataKey::ObservationCount);
 
-        env.events()
-            .publish((TOPIC_OBS,), ObservationEvent {
+        env.events().publish(
+            (TOPIC_OBS,),
+            ObservationEvent {
                 implied_rate: price,
                 at_timestamp: now,
                 slot: head,
-            });
+            },
+        );
 
         Ok(())
     }
@@ -414,11 +418,7 @@ impl Oracle {
         // is at `head` (it's the one that hasn't been clobbered since
         // the last wrap). If `count < N`, oldest is at slot 0.
         let n = cfg.observation_window;
-        let (start, len) = if count < n {
-            (0_u32, count)
-        } else {
-            (head, n)
-        };
+        let (start, len) = if count < n { (0_u32, count) } else { (head, n) };
 
         compute_twap(&env, start, len, n)
     }
@@ -503,7 +503,8 @@ impl Oracle {
         }
         env.storage().instance().set(&DataKey::Paused, &false);
         env.storage().instance().remove(&DataKey::PendingUnpause);
-        env.events().publish((TOPIC_PAUSE, symbol_short!("off")), ());
+        env.events()
+            .publish((TOPIC_PAUSE, symbol_short!("off")), ());
         Ok(())
     }
 
@@ -561,8 +562,7 @@ impl Oracle {
         env.storage().instance().set(&DataKey::Frozen, &false);
         env.storage().instance().remove(&DataKey::PendingReattest);
 
-        env.events()
-            .publish((TOPIC_REATTEST,), (pending.rate, now));
+        env.events().publish((TOPIC_REATTEST,), (pending.rate, now));
         Ok(pending.rate)
     }
 
@@ -688,10 +688,10 @@ fn read_cached_at(env: &Env) -> u64 {
 }
 
 fn write_cached_rate(env: &Env, new_rate: i128, now: u64) {
-    env.storage().persistent().set(&DataKey::CachedRate, &new_rate);
     env.storage()
         .persistent()
-        .set(&DataKey::CachedRateAt, &now);
+        .set(&DataKey::CachedRate, &new_rate);
+    env.storage().persistent().set(&DataKey::CachedRateAt, &now);
     bump_persistent(env, &DataKey::CachedRate);
     bump_persistent(env, &DataKey::CachedRateAt);
 }
@@ -790,10 +790,7 @@ fn compute_twap(env: &Env, start: u32, len: u32, n: u32) -> Result<i128, Error> 
             let dt_u = obs.ts - prev.ts;
             let dt = i128::from(dt_u);
             // weight previous price by the dt it held.
-            let term = prev
-                .price
-                .checked_mul(dt)
-                .ok_or(Error::MathOverflow)?;
+            let term = prev.price.checked_mul(dt).ok_or(Error::MathOverflow)?;
             weighted_sum_lo = weighted_sum_lo
                 .checked_add(term)
                 .ok_or(Error::MathOverflow)?;

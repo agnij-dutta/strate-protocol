@@ -55,7 +55,7 @@ pub fn ln_wad_checked(x: i128) -> Result<i128, Error> {
     // to land in the canonical range. Use bit shifts directly for
     // exactness.
     let mut k: i32;
-    let mut r: i128;
+    let r: i128;
     if x >= WAD {
         // Find highest k such that x >> k >= WAD. r = x >> k still
         // counted at WAD scale (multiplied implicitly by 1).
@@ -100,7 +100,11 @@ pub fn ln_wad_checked(x: i128) -> Result<i128, Error> {
     // r slightly below WAD. The atanh series in step 2 still converges
     // for |u| < 1/3, which holds for r in this wider window, so the math
     // does not need a post-shift correction.
-    debug_assert!(r > WAD / 2 && r < 2 * WAD, "range-reduce invariant: r={}", r);
+    debug_assert!(
+        r > WAD / 2 && r < 2 * WAD,
+        "range-reduce invariant: r={}",
+        r
+    );
 
     // Step 2: compute ln(r/WAD) via atanh series. Let
     //   u = (r - WAD) / (r + WAD)   (WAD-scaled, |u| < 1/3)

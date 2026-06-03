@@ -121,10 +121,7 @@ fn assert_per_op_invariants(f: &Fixture) {
 
     // INV-S2 (conservative form): pt_supply <= YS underlying balance + DEAD.
     let bal = f.market.ys_underlying_balance(&f.env);
-    assert!(
-        pt <= bal + 1_000,
-        "INV-S2: pt={pt} bal={bal}"
-    );
+    assert!(pt <= bal + 1_000, "INV-S2: pt={pt} bal={bal}");
 }
 
 #[test]
@@ -141,9 +138,7 @@ fn master_invariants_fast_tier() {
         // Initial mint so subsequent ops have YT to work with.
         let alice = f.user("alice");
         f.fund(&alice, 5_000 * ONE_UNDERLYING);
-        let _ = f
-            .ys()
-            .try_mint(&alice, &alice, &(2_000 * ONE_UNDERLYING));
+        let _ = f.ys().try_mint(&alice, &alice, &(2_000 * ONE_UNDERLYING));
 
         for _ in 0..ops_per {
             let op = gen_op(&mut rng);

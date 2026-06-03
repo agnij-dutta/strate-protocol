@@ -21,9 +21,7 @@ fn donation_inflation_is_mitigated() {
     // 1. Attacker is the first depositor with a small mint. C-01 dead-shares
     //    guard fires.
     let attacker_deposit = ONE; // 1 underlying = 10_000_000 wei
-    let (att_pt, att_yt, _idx) = f
-        .ys_client()
-        .mint(&attacker, &attacker, &attacker_deposit);
+    let (att_pt, att_yt, _idx) = f.ys_client().mint(&attacker, &attacker, &attacker_deposit);
     assert_eq!(att_pt, attacker_deposit - 1_000);
     assert_eq!(att_yt, attacker_deposit - 1_000);
 
@@ -31,8 +29,7 @@ fn donation_inflation_is_mitigated() {
     //    YS contract via a SAC transfer. This is the classical inflation
     //    move.
     let donation = 1_000_000 * ONE;
-    f.underlying_tok()
-        .transfer(&attacker, &f.ys, &donation);
+    f.underlying_tok().transfer(&attacker, &f.ys, &donation);
 
     // 3. Victim mints. Because YS computes PT 1:1 from `amount` (not
     //    from share-of-underlying-balance), the donation is ignored:
@@ -76,9 +73,7 @@ fn first_deposit_below_dead_shares_reverts() {
     // no-op; the contract rejects it.
     let f = Fixture::new();
     let attacker = f.user(1_000 * ONE);
-    let res = f
-        .ys_client()
-        .try_mint(&attacker, &attacker, &500);
+    let res = f.ys_client().try_mint(&attacker, &attacker, &500);
     assert!(res.is_err(), "tiny first mint should revert");
 }
 

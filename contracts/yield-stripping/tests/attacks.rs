@@ -71,7 +71,10 @@ fn attack_donation_inflation_extreme_donation() {
 fn attack_stale_rate_yt_mint_is_mitigated() {
     let env = Env::default();
     let market = Market::builder()
-        .seed_user("attacker", 10_000 * strate_testutils::constants::ONE_UNDERLYING)
+        .seed_user(
+            "attacker",
+            10_000 * strate_testutils::constants::ONE_UNDERLYING,
+        )
         .build(&env);
     let attacker = market.user(&env, "attacker");
 
@@ -90,7 +93,10 @@ fn attack_stale_rate_yt_mint_large_jump() {
     // the attacker must not realise yield.
     let env = Env::default();
     let market = Market::builder()
-        .seed_user("attacker", 10_000 * strate_testutils::constants::ONE_UNDERLYING)
+        .seed_user(
+            "attacker",
+            10_000 * strate_testutils::constants::ONE_UNDERLYING,
+        )
         .build(&env);
     let attacker = market.user(&env, "attacker");
 
@@ -135,7 +141,10 @@ fn attack_near_maturity_just_outside_window_works_normally() {
             1_000 * strate_testutils::constants::ONE_UNDERLYING,
             1_000 * strate_testutils::constants::ONE_UNDERLYING,
         )
-        .seed_user("attacker", 10_000 * strate_testutils::constants::ONE_UNDERLYING)
+        .seed_user(
+            "attacker",
+            10_000 * strate_testutils::constants::ONE_UNDERLYING,
+        )
         .build(&env);
     let attacker = market.user(&env, "attacker");
 

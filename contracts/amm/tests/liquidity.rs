@@ -24,7 +24,9 @@ fn first_lp_mints_geometric_minus_minimum_liquidity() {
     fx.fund_pt(&fx.provider, pt_in);
     fx.fund_underlying(&fx.provider, und_in);
 
-    let lp_minted = fx.amm_client.add_liquidity(&fx.provider, &pt_in, &und_in, &1);
+    let lp_minted = fx
+        .amm_client
+        .add_liquidity(&fx.provider, &pt_in, &und_in, &1);
 
     // Geometric mean of equal reserves is the reserve size.
     // sqrt(1_000_e7 * 1_000_e7) = 1_000_e7.
@@ -109,11 +111,17 @@ fn remove_liquidity_returns_proportional_share() {
     // pt_out = floor(burn * 1_000*ONE / total_lp) = 4_999_999_500.
     // We sanity-check it's close to half and strictly < half (rounded down).
     let half_reserve = 500 * ONE;
-    assert!(pt_out <= half_reserve, "pt_out={pt_out} > half_reserve={half_reserve}");
+    assert!(
+        pt_out <= half_reserve,
+        "pt_out={pt_out} > half_reserve={half_reserve}"
+    );
     assert!(und_out <= half_reserve);
     // Tolerance bounded by MINIMUM_LIQUIDITY (1_000); the locked share
     // is what keeps pt_out from reaching exactly half.
-    assert!(pt_out > half_reserve - 1_000, "pt_out={pt_out} unexpectedly small");
+    assert!(
+        pt_out > half_reserve - 1_000,
+        "pt_out={pt_out} unexpectedly small"
+    );
 }
 
 #[test]
@@ -121,7 +129,9 @@ fn cannot_remove_more_than_balance() {
     let fx = AmmFixture::new();
     fx.seed_initial_liquidity(1_000 * ONE, 1_000 * ONE);
     let bal = fx.amm_client.lp_balance(&fx.provider);
-    let r = fx.amm_client.try_remove_liquidity(&fx.provider, &(bal + 1), &1, &1);
+    let r = fx
+        .amm_client
+        .try_remove_liquidity(&fx.provider, &(bal + 1), &1, &1);
     assert!(r.is_err());
 }
 
@@ -147,7 +157,6 @@ fn minimum_liquidity_remains_locked_in_total_lp() {
     assert_eq!(total - user, MINIMUM_LIQUIDITY);
     // Even after burning ALL of user's balance, MINIMUM_LIQUIDITY
     // remains in total_lp.
-    fx.amm_client
-        .remove_liquidity(&fx.provider, &user, &1, &1);
+    fx.amm_client.remove_liquidity(&fx.provider, &user, &1, &1);
     assert_eq!(fx.amm_client.total_lp(), MINIMUM_LIQUIDITY);
 }

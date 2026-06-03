@@ -6,12 +6,7 @@ use common::{FactoryFixture, DAY, START_TS, WAD};
 
 const SHORT_MATURITY: u64 = START_TS + 5 * DAY;
 
-fn try_deploy(
-    f: &FactoryFixture,
-    maturity: u64,
-    scalar_root: i128,
-    fee_bps: u32,
-) -> bool {
+fn try_deploy(f: &FactoryFixture, maturity: u64, scalar_root: i128, fee_bps: u32) -> bool {
     let deployer = f.admin.clone();
     f.factory_client
         .try_deploy_market(

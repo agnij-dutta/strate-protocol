@@ -16,12 +16,12 @@ use strate_math::{
 // 2.5 orders of magnitude below the danger line — enough headroom for
 // the rounding bump in `mul_wad_up` to never overflow.
 const SAFE_BOUND: i128 = 1_000_000_000_000_000_000_000_000_000; // 1e27
-// For exp's input domain in the property tests, restrict to a range
-// where the 14-term Taylor + 2^k shift produces relative error well
-// under 1 ULP after monotonicity-relevant step sizes. The AMM only
-// ever calls exp with |x| in single digits of WAD, so the practical
-// "shipped" range is much narrower than the documented theoretical
-// limits [-41, 88].
+                                                                // For exp's input domain in the property tests, restrict to a range
+                                                                // where the 14-term Taylor + 2^k shift produces relative error well
+                                                                // under 1 ULP after monotonicity-relevant step sizes. The AMM only
+                                                                // ever calls exp with |x| in single digits of WAD, so the practical
+                                                                // "shipped" range is much narrower than the documented theoretical
+                                                                // limits [-41, 88].
 const EXP_LO: i128 = -10 * WAD;
 const EXP_HI: i128 = 10 * WAD;
 

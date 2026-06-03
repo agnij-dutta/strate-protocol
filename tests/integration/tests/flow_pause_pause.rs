@@ -30,9 +30,7 @@ fn ys_pause_blocks_mint_but_not_claim_or_redeem() {
     );
 
     // Redeem-pair must still succeed.
-    let r = f
-        .ys()
-        .try_redeem_pair(&alice, &(100 * ONE_UNDERLYING));
+    let r = f.ys().try_redeem_pair(&alice, &(100 * ONE_UNDERLYING));
     assert!(r.is_ok(), "redeem_pair should succeed while paused");
 
     // Claim must still succeed (returns 0 if no accrual).
@@ -77,7 +75,9 @@ fn amm_pause_blocks_swap_and_liquidity() {
 
     f.amm().pause();
 
-    let r = f.amm().try_swap_exact_pt_for_sy(&alice, &(10 * ONE_UNDERLYING), &1);
+    let r = f
+        .amm()
+        .try_swap_exact_pt_for_sy(&alice, &(10 * ONE_UNDERLYING), &1);
     assert!(matches!(r, Ok(Err(_))) || r.is_err());
 
     let r = f

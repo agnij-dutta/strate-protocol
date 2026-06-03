@@ -219,4 +219,3 @@ impl Fixture {
         self.ys_client().current_index()
     }
 }
-

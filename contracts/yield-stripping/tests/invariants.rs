@@ -61,8 +61,11 @@ fn op_strategy() -> impl Strategy<Value = Op> {
     prop_oneof![
         (0u8..4, 1i128..1_000_000_000).prop_map(|(u, a)| Op::Mint { user: u, amount: a }),
         (0u8..4, 1i128..1_000_000_000).prop_map(|(u, a)| Op::Burn { user: u, amount: a }),
-        (0u8..4, 0u8..4, 1i128..1_000_000_000)
-            .prop_map(|(f, t, a)| Op::Transfer { from: f, to: t, amount: a }),
+        (0u8..4, 0u8..4, 1i128..1_000_000_000).prop_map(|(f, t, a)| Op::Transfer {
+            from: f,
+            to: t,
+            amount: a
+        }),
         (0u8..4).prop_map(|u| Op::Claim { user: u }),
         (1u64..time::DAY * 30).prop_map(|s| Op::Advance { seconds: s }),
         // Rate bumps are bounded under the freeze threshold so the

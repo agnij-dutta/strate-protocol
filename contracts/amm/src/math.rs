@@ -122,8 +122,7 @@ pub fn compute_swap_out(
     let denom = x_in
         .checked_add(dx_in_after_fee)
         .ok_or(Error::MathOverflow)?;
-    let y = strate_math::div_wad_checked(x_in, denom)
-        .map_err(map_math)?;
+    let y = strate_math::div_wad_checked(x_in, denom).map_err(map_math)?;
     // y is at most just-under WAD, at least just-above 0.
     if y <= 0 {
         return Err(Error::InsufficientLiquidity);
@@ -158,29 +157,29 @@ pub fn compute_swap_out(
     //    rounded slightly *down* in `foo` — favours the pool.
     let exponent = mul_wad_down_checked(weight_ratio, ln_y).map_err(map_math)?;
 
-    // 6. foo = exp(exponent). In (0, WAD) for negative exponent.
-    //    `exp_wad` saturates at zero for very negative inputs and at
-    //    `i128::MAX` for very positive — neither saturation can occur
-    //    here because `exponent` is at most a few hundred WAD in
-    //    magnitude under reasonable pool conditions, and the C-03 lock
-    //    keeps `weight_ratio` away from infinity.
-    let foo = exp_wad(exponent);
-    if foo <= 0 {
+    // 6. pow_term = exp(exponent) = (x_in/(x_in+dx_in))^(w_in/w_out).
+    //    In (0, WAD) for negative exponent. `exp_wad` saturates at zero
+    //    for very negative inputs and at `i128::MAX` for very positive —
+    //    neither saturation can occur here because `exponent` is at most
+    //    a few hundred WAD in magnitude under reasonable pool conditions,
+    //    and the C-03 lock keeps `weight_ratio` away from infinity.
+    let pow_term = exp_wad(exponent);
+    if pow_term <= 0 {
         // Pathological underflow — treat as a zero-shaped curve.
         return Ok(strate_math::mul_wad_down(x_out, WAD));
     }
-    if foo >= WAD {
+    if pow_term >= WAD {
         // Numerical edge: `exp` of a tiny negative might round to WAD,
         // giving zero output. That is the "no-op trade" outcome.
         return Ok(0);
     }
 
-    // 7. bar = WAD - foo. Strictly in (0, WAD).
-    let bar = WAD - foo;
+    // 7. one_minus_pow = WAD - pow_term. Strictly in (0, WAD).
+    let one_minus_pow = WAD - pow_term;
 
-    // 8. dx_out = x_out * bar / WAD. Round **down** — favour the pool.
+    // 8. dx_out = x_out * (1 - pow_term). Round **down** — favour the pool.
     //    `mul_wad_down` is the explicit rounding form.
-    let dx_out = mul_wad_down_checked(x_out, bar).map_err(map_math)?;
+    let dx_out = mul_wad_down_checked(x_out, one_minus_pow).map_err(map_math)?;
     Ok(dx_out)
 }
 
@@ -206,11 +205,7 @@ pub fn weights_at(
 
     // t_frac = t_remaining / total_duration, in WAD, in (0, 1].
     // total_duration is guaranteed > 0 by the constructor.
-    let t_frac = strate_math::muldiv_floor(
-        t_remaining as i128,
-        WAD,
-        cfg.total_duration as i128,
-    );
+    let t_frac = strate_math::muldiv_floor(t_remaining as i128, WAD, cfg.total_duration as i128);
     if t_frac <= 0 {
         return Err(Error::MarketLockedNearMaturity);
     }
@@ -348,7 +343,10 @@ mod tests {
         let expected = (100 * 10 * ONE) / 110;
         // Should match within a few wei from exp/ln rounding.
         let diff = (dx - expected).abs();
-        assert!(diff < 100_000_000, "dx={dx} expected={expected} diff={diff}");
+        assert!(
+            diff < 100_000_000,
+            "dx={dx} expected={expected} diff={diff}"
+        );
     }
 
     #[test]
@@ -390,11 +388,14 @@ mod tests {
         //
         // So w_in > w_out  ⇒  MORE output per unit input
         //    w_in < w_out  ⇒  LESS output per unit input
-        let low_w_in = compute_swap_out(100 * ONE, 100 * ONE, 10 * ONE, HALF / 2, HALF + HALF / 2, 0)
-            .unwrap();
-        let high_w_in = compute_swap_out(100 * ONE, 100 * ONE, 10 * ONE, HALF + HALF / 2, HALF / 2, 0)
-            .unwrap();
-        assert!(high_w_in > low_w_in, "low_w_in={low_w_in} high_w_in={high_w_in}");
+        let low_w_in =
+            compute_swap_out(100 * ONE, 100 * ONE, 10 * ONE, HALF / 2, HALF + HALF / 2, 0).unwrap();
+        let high_w_in =
+            compute_swap_out(100 * ONE, 100 * ONE, 10 * ONE, HALF + HALF / 2, HALF / 2, 0).unwrap();
+        assert!(
+            high_w_in > low_w_in,
+            "low_w_in={low_w_in} high_w_in={high_w_in}"
+        );
     }
 
     #[test]

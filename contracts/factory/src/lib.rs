@@ -504,11 +504,9 @@ impl Factory {
 
         let meta_key = DataKey::MarketMeta(ys.clone());
         env.storage().persistent().set(&meta_key, &meta);
-        env.storage().persistent().extend_ttl(
-            &meta_key,
-            PERSISTENT_BUMP_LOW,
-            PERSISTENT_BUMP_HIGH,
-        );
+        env.storage()
+            .persistent()
+            .extend_ttl(&meta_key, PERSISTENT_BUMP_LOW, PERSISTENT_BUMP_HIGH);
 
         env.storage()
             .persistent()
@@ -526,7 +524,10 @@ impl Factory {
 
     /// Lookup the canonical YS address for `(underlying, maturity)`.
     pub fn market_address(env: Env, underlying: Address, maturity: u64) -> Option<Address> {
-        let key = MarketKey { underlying, maturity };
+        let key = MarketKey {
+            underlying,
+            maturity,
+        };
         env.storage().persistent().get(&DataKey::MarketByKey(key))
     }
 
@@ -627,10 +628,7 @@ impl Factory {
             .ledger()
             .timestamp()
             .saturating_add(UPGRADE_TIMELOCK_SECONDS);
-        let pending = PendingUpgrade {
-            new_wasm_hash,
-            eta,
-        };
+        let pending = PendingUpgrade { new_wasm_hash, eta };
         env.storage()
             .instance()
             .set(&DataKey::PendingUpgrade, &pending);

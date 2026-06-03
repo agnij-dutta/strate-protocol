@@ -37,8 +37,6 @@
 
 use soroban_sdk::{contract, contractimpl, contracttype, panic_with_error, Address, Env};
 
-use crate::constants::ONE_UNDERLYING;
-
 /// Errors raised by the mock pool.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u32)]
@@ -103,17 +101,15 @@ impl MockBlendPool {
         if initial_rate <= 0 {
             panic_with_error!(&env, MockBlendError::InvalidRate);
         }
-        env.storage().instance().set(&DataKey::Underlying, &underlying);
+        env.storage()
+            .instance()
+            .set(&DataKey::Underlying, &underlying);
         env.storage().instance().set(&DataKey::BRate, &initial_rate);
         env.storage()
             .instance()
             .set(&DataKey::LastAccrualTs, &env.ledger().timestamp());
-        env.storage()
-            .instance()
-            .set(&DataKey::Reserve, &0_i128);
-        env.storage()
-            .instance()
-            .set(&DataKey::Initialised, &true);
+        env.storage().instance().set(&DataKey::Reserve, &0_i128);
+        env.storage().instance().set(&DataKey::Initialised, &true);
     }
 
     /// **Test-only.** Set the pool's `b_rate` directly.
@@ -164,7 +160,11 @@ impl MockBlendPool {
     /// `delta` is signed: positive = supply, negative = withdraw.
     /// Returns the new `b_rate` so callers can mirror Blend's behaviour of
     /// returning fresh accrual on every interaction.
-    pub fn submit(env: Env, _from: Address, delta: i128) -> i128 {
+    pub fn submit(env: Env, from: Address, delta: i128) -> i128 {
+        // The real Blend pool meters per-supplier; this mock tracks only
+        // the aggregate reserve, so the supplier address is accepted to
+        // match the signature but intentionally unused.
+        let _ = from;
         require_init(&env);
 
         let mut reserve: i128 = env.storage().instance().get(&DataKey::Reserve).unwrap();
@@ -228,7 +228,7 @@ pub fn bumped_rate(old_rate: i128, rel_delta_wad: i128) -> i128 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::WAD;
+    use crate::constants::{ONE_UNDERLYING, WAD};
 
     #[test]
     fn bumped_rate_one_percent_matches_expectation() {

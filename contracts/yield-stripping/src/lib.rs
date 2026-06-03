@@ -117,21 +117,10 @@ pub trait Underlying {
 // =========================================================================
 
 /// Immutable config — set once in `__constructor`, no setter.
-#[contracttype]
-#[derive(Clone)]
-pub struct Config {
-    pub underlying: Address,
-    pub pt: Address,
-    pub yt: Address,
-    pub oracle: Address,
-    pub maturity: u64,
-    /// AMM curve parameter, immutable per market. YS doesn't use this
-    /// directly; recorded for discoverability so external callers can
-    /// read the market's curve scaling from a single contract.
-    pub scalar_root: i128,
-    /// Admin address — single role: pause/unpause.
-    pub admin: Address,
-}
+/// Re-exported under the historical name `Config` from
+/// [`strate_types::YsConfig`] so external callers (factory, testutils,
+/// integration tests) keep their existing import paths.
+pub use strate_types::YsConfig as Config;
 
 #[contracttype]
 #[derive(Clone)]

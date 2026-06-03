@@ -11,6 +11,7 @@ members = [
     "packages/strate-interfaces",
     "packages/strate-math",
     "packages/strate-testutils",
+    "packages/strate-types",
     "tests/integration",
 ]
 
@@ -39,6 +40,7 @@ soroban-fixed-point-math = "1.3.0"
 strate-interfaces = { path = "packages/strate-interfaces" }
 strate-math = { path = "packages/strate-math" }
 strate-testutils = { path = "packages/strate-testutils" }
+strate-types = { path = "packages/strate-types" }
 
 # Dev-deps.
 proptest = "1.4"

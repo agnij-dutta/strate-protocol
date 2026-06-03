@@ -69,20 +69,10 @@ enum DataKey {
 // -------------------------------------------------------------------------
 
 /// Constructor input. The factory passes this when deploying the token.
-#[contracttype]
-#[derive(Clone)]
-pub struct PtInitArgs {
-    /// Display handle for the underlying asset (not called into).
-    pub underlying: Address,
-    /// Maturity timestamp (Unix seconds).
-    pub maturity: u64,
-    /// Token name, e.g. `"PT-bUSDC-DEC2026"`.
-    pub name: String,
-    /// Symbol, e.g. `"PT-bUSDC"`.
-    pub symbol: String,
-    /// Decimals (matches underlying).
-    pub decimals: u32,
-}
+/// Re-exported from [`strate_types::PtInitArgs`] so the wire format is
+/// shared with the Factory (which depends only on `strate-types`, not on
+/// this crate's cdylib half).
+pub use strate_types::PtInitArgs;
 
 // -------------------------------------------------------------------------
 // Contract

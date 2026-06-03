@@ -97,21 +97,10 @@ const BLEND_TO_WAD_SCALE: i128 = 1_000_000_000;
 /// The remaining fields are intentionally part of `Config` so a single
 /// `instance.get` returns the entire config in one shot; this is the
 /// hottest read path so we trade a bit of write-cost for read efficiency.
-#[contracttype]
-#[derive(Clone, Debug)]
-pub struct OracleConfig {
-    /// Address of the Blend lending pool we read `b_rate` from.
-    pub blend_pool: Address,
-    /// Maximum allowed relative jump per `sync_rate`, in WAD.
-    /// `5e16` == 5%. A rate moving more than this freezes the oracle.
-    pub max_delta_per_sync_wad: i128,
-    /// Maximum age (in ledger units) of `CachedRate` before reads revert.
-    /// At 5s/ledger, 120 ledgers ≈ 10 minutes.
-    pub max_staleness_ledgers: u32,
-    /// Size of the TWAP ring buffer. Bounded so it always fits in
-    /// instance budget. Values < 2 are rejected at construction.
-    pub observation_window: u32,
-}
+///
+/// Re-exported from [`strate_types::OracleConfig`] so the wire format is
+/// shared with the Factory.
+pub use strate_types::OracleConfig;
 
 /// One TWAP observation. `price` is WAD-scaled; `ts` is ledger
 /// timestamp in seconds.

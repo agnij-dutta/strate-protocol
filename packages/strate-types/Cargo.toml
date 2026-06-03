@@ -1,0 +1,13 @@
+[package]
+name = "strate-types"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Shared constructor arg types for the Strate protocol. Lives in a no_std rlib so the Factory can import the contracttype structs it forwards to deploy_v2 without pulling in the child contracts' cdylib glue (which collides on `__constructor` when linked together for wasm32)."
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }

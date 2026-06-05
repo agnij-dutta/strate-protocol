@@ -190,6 +190,7 @@ impl FactoryFixture {
             &maturity,
             &WAD,    // scalar_root = 1.0 WAD
             &30_u32, // 30 bps swap fee
+            &0_i128, // tvl_cap = 0 means uncapped (tests predate the field)
             &default_oracle_params(),
             &make_token_meta(
                 &self.env,

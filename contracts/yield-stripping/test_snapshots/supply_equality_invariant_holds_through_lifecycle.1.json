@@ -1293,6 +1293,17 @@
                             },
                             {
                               "key": {
+                                "symbol": "tvl_cap"
+                              },
+                              "val": {
+                                "i128": {
+                                  "hi": 0,
+                                  "lo": 0
+                                }
+                              }
+                            },
+                            {
+                              "key": {
                                 "symbol": "underlying"
                               },
                               "val": {

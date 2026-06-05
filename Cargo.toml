@@ -8,6 +8,7 @@ members = [
     "contracts/yt-token",
     "contracts/factory",
     "contracts/mock-blend",
+    "contracts/blend-adapter",
     "packages/strate-interfaces",
     "packages/strate-math",
     "packages/strate-testutils",

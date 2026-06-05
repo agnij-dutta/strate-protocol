@@ -76,4 +76,8 @@ pub enum Error {
     /// Underlying asset is not one the protocol supports for this
     /// factory.
     InvalidUnderlying = 101,
+    /// Mint would push `TotalUnderlying` past the market's `tvl_cap`.
+    /// Returned by YS::mint; introduced for the unaudited mainnet
+    /// launch where every market ships with a hard cap.
+    TvlCapExceeded = 102,
 }

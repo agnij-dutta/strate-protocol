@@ -1,0 +1,16 @@
+[package]
+name = "blend-adapter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Translation shim: exposes the V1-shaped get_reserve_data() that strate-oracle expects, internally calling Blend V2's get_reserve(asset) and rescaling 1e12 → 1e9. One adapter per (pool, asset) pair."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

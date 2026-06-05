@@ -280,6 +280,7 @@ impl Factory {
         maturity: u64,
         scalar_root: i128,
         fee_bps: u32,
+        tvl_cap: i128,
         oracle_params: OracleParams,
         token_meta: TokenMetadata,
     ) -> Address {
@@ -442,6 +443,9 @@ impl Factory {
             .deploy_v2(amm_wasm, amm_args);
 
         // 5. YieldStripping
+        if tvl_cap < 0 {
+            panic_with_error!(&env, Error::Math);
+        }
         let ys_cfg = YsConfig {
             underlying: underlying.clone(),
             pt: pt.clone(),
@@ -450,6 +454,7 @@ impl Factory {
             maturity,
             scalar_root,
             admin: admin.clone(),
+            tvl_cap,
         };
         let ys_args: Vec<Val> = (ys_cfg,).into_val(&env);
         let ys = env

@@ -38,6 +38,7 @@ fn deploy_count_unchanged_after_failed_duplicate() {
             &maturity,
             &common::WAD,
             &30_u32,
+            &0_i128,
             &common::default_oracle_params(),
             &common::make_token_meta(&f.env, "PT", "PT", "YT", "YT"),
         )

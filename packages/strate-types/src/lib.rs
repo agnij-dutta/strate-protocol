@@ -98,6 +98,13 @@ pub struct YsConfig {
     pub scalar_root: i128,
     /// Admin address — single role: pause/unpause.
     pub admin: Address,
+    /// Hard cap on total underlying deposited into this market, in
+    /// underlying-token base units (7 decimals on Stellar for SAC).
+    ///
+    /// Immutable per market. Enforced on every `mint`. A value of `0`
+    /// means "no cap" — only safe post-audit; until then every mainnet
+    /// deploy MUST set this to a real number.
+    pub tvl_cap: i128,
 }
 
 // =========================================================================

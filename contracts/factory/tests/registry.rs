@@ -21,6 +21,7 @@ fn market_count_increments_per_deploy() {
         &m2,
         &common::WAD,
         &30_u32,
+        &0_i128,
         &common::default_oracle_params(),
         &common::make_token_meta(&f.env, "PT-180", "PT-180", "YT-180", "YT-180"),
     );
@@ -41,6 +42,7 @@ fn get_market_by_index_returns_each_address() {
         &m2,
         &common::WAD,
         &30_u32,
+        &0_i128,
         &common::default_oracle_params(),
         &common::make_token_meta(&f.env, "PT-180", "PT-180", "YT-180", "YT-180"),
     );

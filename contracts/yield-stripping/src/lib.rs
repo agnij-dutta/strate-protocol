@@ -277,12 +277,19 @@ impl YieldStripping {
             .instance()
             .get(&DataKey::TotalUnderlying)
             .unwrap_or(0);
-        env.storage().instance().set(
-            &DataKey::TotalUnderlying,
-            &prev
-                .checked_add(amount)
-                .unwrap_or_else(|| panic_with_error!(&env, Error::MathOverflow)),
-        );
+        let new_total = prev
+            .checked_add(amount)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::MathOverflow));
+        // tvl_cap = 0 means "no cap" — only valid post-audit; mainnet
+        // markets always ship with cfg.tvl_cap > 0. The check applies
+        // *before* persisting `TotalUnderlying`, and *before* any
+        // underlying.transfer so a rejected mint touches nothing.
+        if cfg.tvl_cap > 0 && new_total > cfg.tvl_cap {
+            panic_with_error!(&env, Error::TvlCapExceeded);
+        }
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalUnderlying, &new_total);
 
         // Interactions.
         UnderlyingClient::new(&env, &cfg.underlying).transfer(

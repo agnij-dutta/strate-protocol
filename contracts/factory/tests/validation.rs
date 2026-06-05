@@ -16,6 +16,7 @@ fn try_deploy(f: &FactoryFixture, maturity: u64, scalar_root: i128, fee_bps: u32
             &maturity,
             &scalar_root,
             &fee_bps,
+            &0_i128,
             &common::default_oracle_params(),
             &common::make_token_meta(&f.env, "PT", "PT", "YT", "YT"),
         )

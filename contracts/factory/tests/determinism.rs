@@ -55,6 +55,7 @@ fn distinct_maturities_succeed() {
         &maturity2,
         &common::WAD,
         &30_u32,
+        &0_i128,
         &common::default_oracle_params(),
         &common::make_token_meta(
             &f.env,

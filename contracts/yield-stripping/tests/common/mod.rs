@@ -139,6 +139,11 @@ impl Fixture {
                 maturity,
                 scalar_root: WAD,
                 admin: admin.clone(),
+                // 0 = no cap; tests predate the tvl_cap field and don't
+                // care about the bound. Mainnet deploys must set a real
+                // cap; the factory's deploy_market accepts the value
+                // from its caller.
+                tvl_cap: 0,
             },),
         );
 
